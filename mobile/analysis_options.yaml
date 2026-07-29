@@ -1,0 +1,21 @@
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  exclude:
+    - "**/*.g.dart"
+    - "**/*.freezed.dart"
+  errors:
+    invalid_annotation_target: ignore
+
+linter:
+  rules:
+    prefer_const_constructors: true
+    prefer_const_literals_to_create_immutables: true
+    prefer_final_locals: true
+    use_super_parameters: true
+    avoid_print: true
+    sized_box_for_whitespace: true
+    avoid_unnecessary_containers: true
+    cancel_subscriptions: true
+    close_sinks: true
+    unawaited_futures: true

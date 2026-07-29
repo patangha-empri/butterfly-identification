@@ -1,0 +1,44 @@
+# ── Core Framework ────────────────────────────────────────────────────────────
+Flask==3.0.3
+Werkzeug==3.0.4
+
+# ── Database ──────────────────────────────────────────────────────────────────
+Flask-SQLAlchemy==3.1.1
+Flask-Migrate==4.0.7
+psycopg2-binary==2.9.12
+supabase==2.31.0              # PostgREST client — used where direct Postgres (5432/6543) is firewalled
+
+# ── Authentication & Security ─────────────────────────────────────────────────
+Flask-JWT-Extended==4.6.0
+Flask-Bcrypt==1.0.1
+Flask-Limiter==3.8.0          # rate limiting — required for all API endpoints
+
+# ── API & Serialization ───────────────────────────────────────────────────────
+Flask-CORS==4.0.1
+marshmallow==3.21.3
+Flask-Marshmallow==1.2.1
+marshmallow-sqlalchemy==1.1.0
+email-validator==2.2.0        # REQUIRED by marshmallow Email field — will crash without it
+
+# ── AI Integration ────────────────────────────────────────────────────────────
+google-generativeai==0.7.2    # Gemini Vision API
+
+# ── File Storage & Image Processing ──────────────────────────────────────────
+Pillow==12.2.0                # image compression, thumbnail generation
+requests==2.32.3              # Bunny Storage API calls (no official SDK)
+
+# ── Push Notifications ────────────────────────────────────────────────────────
+firebase-admin==6.5.0         # Firebase FCM — send push notifications to Flutter app
+
+# ── Reports & Export ──────────────────────────────────────────────────────────
+reportlab==4.2.2              # PDF export for admin reports
+openpyxl==3.1.3               # Excel / CSV export for admin reports
+
+# ── CMS & Content ─────────────────────────────────────────────────────────────
+bleach==6.1.0                 # sanitize HTML in CMS articles before saving to DB
+
+# ── Utilities ─────────────────────────────────────────────────────────────────
+python-dotenv==1.0.1
+python-slugify==8.0.4
+click==8.1.7
+gunicorn==22.0.0

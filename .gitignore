@@ -1,0 +1,7 @@
+# Claude Code working state — agent worktrees, local permission settings.
+# Never commit this: it's per-machine tooling state, not project source.
+.claude/
+
+# OS cruft
+.DS_Store
+Thumbs.db

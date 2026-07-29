@@ -1,0 +1,28 @@
+targets:
+  $default:
+    builders:
+      # ── Freezed ──────────────────────────────────────────────────────────
+      freezed:
+        options:
+          copy_with: true
+          equal: true
+          when: true
+          map: true
+
+      # ── Drift ─────────────────────────────────────────────────────────────
+      drift_dev:
+        options:
+          sql:
+            dialects:
+              - sqlite
+          scoped_dart_components: true
+
+      # ── json_serializable ─────────────────────────────────────────────────
+      json_serializable:
+        options:
+          any_map: false
+          checked: true
+          explicit_to_json: true
+          field_rename: snake
+          ignore_unannotated: false
+          include_if_null: false
