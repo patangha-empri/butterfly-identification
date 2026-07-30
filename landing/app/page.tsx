@@ -885,13 +885,16 @@ export default function Home() {
               <h5>Legal</h5>
               <ul>
                 <li>
-                  <a href="https://butterflyindia.app/privacy">Privacy policy</a>
+                  <Link href="/data-contribution">Data contribution</Link>
                 </li>
                 <li>
-                  <a href="https://butterflyindia.app/terms">Terms of use</a>
+                  <Link href="/privacy">Privacy policy</Link>
                 </li>
                 <li>
-                  <a href="mailto:support@butterflyindia.app">support@butterflyindia.app</a>
+                  <Link href="/terms">Terms of use</Link>
+                </li>
+                <li>
+                  <a href="mailto:pathangaempri@gmail.com">pathangaempri@gmail.com</a>
                 </li>
               </ul>
             </div>
