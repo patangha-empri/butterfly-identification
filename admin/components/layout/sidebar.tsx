@@ -45,7 +45,7 @@ export function Sidebar({ className, onNavClick }: SidebarProps) {
     <aside className={cn("flex flex-col h-full bg-sidebar border-r border-sidebar-border", className)}>
       {/* Logo */}
       <div className="flex items-center gap-2.5 px-4 h-14 border-b border-sidebar-border shrink-0">
-        <img src="/pathanga-logo.png" alt="Pathanga — EMPRI" className="h-9 w-auto" />
+        <img src="/admin/pathanga-logo.png" alt="Pathanga — EMPRI" className="h-9 w-auto" />
         <div>
           <p className="text-sm font-semibold text-sidebar-foreground leading-tight">Pathanga Admin</p>
           <p className="text-[10px] text-sidebar-foreground/50 leading-tight">EMPRI · Biodiversity Platform</p>

@@ -129,7 +129,7 @@ export default function LoginPage() {
         {/* Branding */}
         <div className="text-center space-y-2">
           <img
-            src="/pathanga-logo.png"
+            src="/admin/pathanga-logo.png"
             alt="Pathanga — EMPRI"
             className="mx-auto h-20 w-auto"
           />

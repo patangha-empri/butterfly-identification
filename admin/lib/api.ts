@@ -3,7 +3,8 @@ import { getToken, clearAuth } from "./auth";
 
 const BASE_URL =
   (process.env.NEXT_PUBLIC_API_URL ??
-    "https://staging.thirdeyegfx.in/butterfly_backend") + "/api/v1";
+    "https://staging.thirdeyegfx.in/butterfly_backend")
+    .replace(/\/$/, "") + "/api/v1";
 
 const api = axios.create({
   baseURL: BASE_URL,

@@ -1,0 +1,42 @@
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /admin/
+
+  # 1. Force HTTPS (Handles standard SSL and HTTPS reverse proxies)
+  RewriteCond %{HTTPS} !=on
+  RewriteCond %{HTTP:X-Forwarded-Proto} !https
+  RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+  # 2. Prevent index.html exposure
+  RewriteCond %{THE_REQUEST} ^[A-Z]{3,9}\ /admin/index\.html\ HTTP/
+  RewriteRule ^index\.html$ /admin/ [R=301,L]
+
+  # 3. Dynamic Route Rewrites: Map dynamic browser URLs to our static Next.js templates
+  
+  # Rewrite /observations/:id to /admin/observations/id/index.html
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule ^observations/([^/]+)/?$ /admin/observations/id/index.html [L]
+
+  # Rewrite /species/:id to /admin/species/id/index.html
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule ^species/([^/]+)/?$ /admin/species/id/index.html [L]
+
+  # Rewrite /users/:id to /admin/users/id/index.html
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule ^users/([^/]+)/?$ /admin/users/id/index.html [L]
+
+  # 4. Handle trailing slashes explicitly for folders before checking file existence
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^(.*[^/])$ https://%{HTTP_HOST}/admin/$1/ [R=301,L]
+
+  # 5. Serve existing files and directories directly
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  # 6. Fallback to custom 404
+  RewriteRule ^ /admin/404.html [L]
+</IfModule>

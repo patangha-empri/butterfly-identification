@@ -98,7 +98,7 @@ class ProductionConfig(BaseConfig):
 
     # CORS — set CORS_ORIGINS env in cPanel to a comma-separated list, e.g.
     #   CORS_ORIGINS=https://admin.yoursite.com,https://yoursite.com
-    _cors_env = os.environ.get("CORS_ORIGINS", "").strip()
+    _cors_env = os.environ.get("CORS_ORIGINS", os.environ.get("CORS_ALLOWED_ORIGINS", "https://pathanga.com")).strip()
     if _cors_env:
         CORS_ORIGINS = [o.strip() for o in _cors_env.split(",") if o.strip()]
 
