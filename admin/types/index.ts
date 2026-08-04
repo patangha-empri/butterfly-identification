@@ -79,6 +79,14 @@ export interface SpeciesImage {
   is_primary?: boolean;
   credit?: string;
   caption?: string;
+  // Editable details. Mostly populated by the research ingestion pipeline;
+  // the admin image dialog can correct them.
+  photographer?: string | null;
+  license?: string | null;
+  source?: string | null;
+  source_page_url?: string | null;
+  capture_location?: string | null;
+  capture_date?: string | null;
 }
 
 export interface SpeciesHostPlant {

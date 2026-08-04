@@ -5,6 +5,7 @@ from app.schemas.admin import (
     SpeciesCreateSchema, SpeciesUpdateSchema,
     DistributionSchema, HostPlantSchema,
     FieldDefinitionCreateSchema, FieldDefinitionUpdateSchema,
+    SpeciesImageUpdateSchema,
 )
 from app.services import species_service
 from app.services.species_service import SpeciesError
@@ -22,6 +23,7 @@ _dist_schema = DistributionSchema()
 _plant_schema = HostPlantSchema()
 _field_def_create_schema = FieldDefinitionCreateSchema()
 _field_def_update_schema = FieldDefinitionUpdateSchema()
+_image_update_schema = SpeciesImageUpdateSchema()
 
 
 @admin_species_bp.get("/")
@@ -175,11 +177,54 @@ def add_image(species_id):
         return error_response(err, 400)
     image_type = request.form.get("image_type", "reference")
     credit = request.form.get("credit")
+    # Optional details, same set the PATCH below edits. Sent as form fields
+    # because the upload itself has to be multipart.
+    metadata = {
+        key: request.form.get(key)
+        for key in species_service.IMAGE_EDITABLE_FIELDS
+        if request.form.get(key)
+    }
     try:
-        img = species_service.add_species_image(species_id, file, image_type, credit)
+        img = species_service.add_species_image(
+            species_id, file, image_type, credit, metadata
+        )
     except SpeciesError as e:
         return error_response(e.message, e.status_code)
     return success_response(data=img, status_code=201)
+
+
+@admin_species_bp.patch("/<species_id>/images/<image_id>")
+@admin_required
+def update_image(species_id, image_id):
+    """Edit an image's details. The picture itself is swapped by /file below."""
+    body = request.get_json(silent=True) or {}
+    errors = _image_update_schema.validate(body)
+    if errors:
+        return error_response("Validation failed.", 422, errors=errors)
+    data = _image_update_schema.load(body)
+    try:
+        img = species_service.update_species_image(species_id, image_id, data)
+    except SpeciesError as e:
+        return error_response(e.message, e.status_code)
+    return success_response(data=img, message="Image details updated.")
+
+
+@admin_species_bp.post("/<species_id>/images/<image_id>/file")
+@admin_required
+def replace_image(species_id, image_id):
+    """
+    Replace the picture, keeping the same image record — so its primary flag
+    and credit/licence details survive a correction.
+    """
+    file = request.files.get("image")
+    ok, err = validate_image_file(file)
+    if not ok:
+        return error_response(err, 400)
+    try:
+        img = species_service.replace_species_image(species_id, image_id, file)
+    except SpeciesError as e:
+        return error_response(e.message, e.status_code)
+    return success_response(data=img, message="Image replaced.")
 
 
 @admin_species_bp.delete("/<species_id>/images/<image_id>")

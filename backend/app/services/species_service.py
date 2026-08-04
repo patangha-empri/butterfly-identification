@@ -1,7 +1,7 @@
 """Species listing, filtering, and admin CRUD — via Supabase PostgREST."""
 import uuid
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 # pyrefly: ignore [missing-import]
 from slugify import slugify
@@ -171,13 +171,8 @@ def _to_dict(row: dict, include_related: bool = False, observation_counts: dict 
         # app and the read-only detail view, which already render it.
         data["images"] = [
             {
-                "id": img.get("id"),
-                "image_url": img["image_url"],
-                "thumbnail_url": img.get("thumbnail_url"),
-                "image_type": img.get("image_type"),
+                **_image_to_dict(img),
                 "caption": f"{row['common_name']} - {img.get('image_type')}",
-                "credit": img.get("credit"),
-                "is_primary": img.get("is_primary"),
             }
             for img in images
         ]
@@ -186,8 +181,22 @@ def _to_dict(row: dict, include_related: bool = False, observation_counts: dict 
     return data
 
 
+#: Image metadata an admin may edit after upload. Everything else on the row is
+#: derived (urls, dimensions, checksum) or set by the ingestion pipeline.
+IMAGE_EDITABLE_FIELDS = (
+    "image_type",
+    "credit",
+    "photographer",
+    "license",
+    "source",
+    "source_page_url",
+    "capture_location",
+    "capture_date",
+)
+
+
 def _image_to_dict(img: dict) -> dict:
-    return {
+    data = {
         "id": img["id"],
         "image_url": img["image_url"],
         "thumbnail_url": img.get("thumbnail_url"),
@@ -195,6 +204,11 @@ def _image_to_dict(img: dict) -> dict:
         "is_primary": img.get("is_primary"),
         "credit": img.get("credit"),
     }
+    # Returned so the admin edit dialog can prefill rather than blanking fields
+    # the ingestion pipeline populated.
+    for field in IMAGE_EDITABLE_FIELDS:
+        data[field] = img.get(field)
+    return data
 
 
 def _distribution_to_dict(d: dict) -> dict:
@@ -560,7 +574,9 @@ def retire_field_definition(definition_id: str) -> None:
 
 # ── Species images ─────────────────────────────────────────────────────────────
 
-def add_species_image(species_id: str, file_storage, image_type: str, credit: str = None) -> dict:
+def add_species_image(
+    species_id: str, file_storage, image_type: str, credit: str = None, metadata: dict = None
+) -> dict:
     from app.services.storage_service import upload_file
 
     sb = get_supabase()
@@ -580,10 +596,86 @@ def add_species_image(species_id: str, file_storage, image_type: str, credit: st
         "image_type": image_type,
         "is_primary": is_primary,
         "credit": credit,
+        "width": urls.get("width"),
+        "height": urls.get("height"),
+        "file_size_bytes": urls.get("file_size_bytes"),
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
+    # Same optional details the edit dialog exposes, so an admin can fill them in
+    # at upload time instead of saving and immediately editing.
+    for key, value in (metadata or {}).items():
+        if key in IMAGE_EDITABLE_FIELDS and value not in (None, ""):
+            row[key] = value
+
     res = sb.table("species_images").insert(row).execute()
     return _image_to_dict(res.data[0])
+
+
+def _get_image_row(species_id: str, image_id: str) -> dict:
+    sb = get_supabase()
+    res = (
+        sb.table("species_images")
+        .select("*")
+        .eq("id", image_id)
+        .eq("species_id", species_id)
+        .execute()
+    )
+    if not res.data:
+        raise SpeciesError("Image not found.", 404)
+    return res.data[0]
+
+
+def update_species_image(species_id: str, image_id: str, data: dict) -> dict:
+    """
+    Edit an image's details — type, credit, licensing, capture info.
+
+    Only the keys actually sent are written, so a dialog that submits a subset
+    cannot blank the fields the ingestion pipeline filled in.
+    """
+    _get_image_row(species_id, image_id)
+
+    payload = {k: v for k, v in data.items() if k in IMAGE_EDITABLE_FIELDS}
+    if not payload:
+        raise SpeciesError("No editable image fields were provided.", 400)
+
+    # Marshmallow gives back date/datetime objects, which the PostgREST client
+    # cannot JSON-encode — send them as ISO strings.
+    for key, value in payload.items():
+        if isinstance(value, (datetime, date)):
+            payload[key] = value.isoformat()
+
+    sb = get_supabase()
+    sb.table("species_images").update(payload).eq("id", image_id).eq(
+        "species_id", species_id
+    ).execute()
+    return _image_to_dict(_get_image_row(species_id, image_id))
+
+
+def replace_species_image(species_id: str, image_id: str, file_storage) -> dict:
+    """
+    Swap the picture while keeping the row.
+
+    Deleting and re-uploading would lose the image's primary flag, its ordering
+    and all of its credit/licence metadata — so correcting a wrong photo would
+    silently cost the admin everything they had typed. This keeps the id and
+    replaces only what the new file determines.
+    """
+    from app.services.storage_service import upload_file
+
+    _get_image_row(species_id, image_id)
+    urls = upload_file(file_storage, folder=f"species/{species_id}", filename=None)
+
+    sb = get_supabase()
+    sb.table("species_images").update(
+        {
+            "image_url": urls["optimized_url"],
+            "thumbnail_url": urls["thumbnail_url"],
+            "width": urls.get("width"),
+            "height": urls.get("height"),
+            "file_size_bytes": urls.get("file_size_bytes"),
+        }
+    ).eq("id", image_id).eq("species_id", species_id).execute()
+    return _image_to_dict(_get_image_row(species_id, image_id))
 
 
 def delete_species_image(species_id: str, image_id: str) -> None:

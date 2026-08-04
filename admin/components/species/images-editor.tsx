@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Star, Trash2, Upload } from "lucide-react";
+import { Loader2, Pencil, Star, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 
 import api, { apiErrorMessage } from "@/lib/api";
@@ -18,21 +18,8 @@ import {
 } from "@/components/ui/select";
 import type { ApiResponse, Species, SpeciesImage } from "@/types";
 
-/** Mirrors ALLOWED_IMAGE_EXTENSIONS and MAX_CONTENT_LENGTH in the backend. */
-const ACCEPT = ".jpg,.jpeg,.png,.webp";
-const MAX_BYTES = 10 * 1024 * 1024;
-
-const IMAGE_TYPES = [
-  { value: "reference", label: "Reference" },
-  { value: "male", label: "Male" },
-  { value: "female", label: "Female" },
-  { value: "upperside", label: "Upperside" },
-  { value: "underside", label: "Underside" },
-  { value: "egg", label: "Egg" },
-  { value: "larva", label: "Larva" },
-  { value: "pupa", label: "Pupa" },
-  { value: "habitat", label: "Habitat" },
-];
+import { SpeciesImageEditDialog } from "./image-edit-dialog";
+import { IMAGE_ACCEPT, IMAGE_TYPES, MAX_IMAGE_BYTES } from "./image-constants";
 
 /**
  * Image manager for a species.
@@ -50,6 +37,7 @@ export function SpeciesImagesEditor({ species }: { species: Species }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [imageType, setImageType] = useState("reference");
   const [credit, setCredit] = useState("");
+  const [editing, setEditing] = useState<SpeciesImage | null>(null);
 
   const images = species.images ?? [];
 
@@ -107,7 +95,7 @@ export function SpeciesImagesEditor({ species }: { species: Species }) {
     if (!file) return;
     // Checked here as well as server-side so a 10 MB upload isn't sent just to
     // be rejected on arrival.
-    if (file.size > MAX_BYTES) {
+    if (file.size > MAX_IMAGE_BYTES) {
       toast.error(
         `“${file.name}” is ${(file.size / 1024 / 1024).toFixed(1)} MB. The limit is 10 MB.`
       );
@@ -160,6 +148,18 @@ export function SpeciesImagesEditor({ species }: { species: Species }) {
                       .join(" · ") || "—"}
                   </span>
                   <div className="flex shrink-0 items-center">
+                    {img.id && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        title="Edit details or replace this picture"
+                        disabled={busy}
+                        onClick={() => setEditing(img)}
+                      >
+                        <Pencil size={12} />
+                      </Button>
+                    )}
                     {!isPrimary && img.id && (
                       <Button
                         type="button"
@@ -238,7 +238,7 @@ export function SpeciesImagesEditor({ species }: { species: Species }) {
           <input
             ref={fileRef}
             type="file"
-            accept={ACCEPT}
+            accept={IMAGE_ACCEPT}
             className="hidden"
             onChange={(e) => onPick(e.target.files?.[0])}
           />
@@ -262,6 +262,15 @@ export function SpeciesImagesEditor({ species }: { species: Species }) {
           </p>
         </div>
       </div>
+
+      <SpeciesImageEditDialog
+        speciesId={species.id}
+        // Read from the refreshed list, not the click-time snapshot, so the
+        // preview updates after replacing the picture.
+        image={editing ? (images.find((i) => i.id === editing.id) ?? editing) : null}
+        open={Boolean(editing)}
+        onOpenChange={(o) => !o && setEditing(null)}
+      />
     </div>
   );
 }

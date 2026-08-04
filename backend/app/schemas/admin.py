@@ -227,6 +227,23 @@ class RejectObservationSchema(ma.Schema):
     admin_notes = fields.Str(required=True, validate=validate.Length(min=5, max=1000))
 
 
+class SpeciesImageUpdateSchema(ma.Schema):
+    """
+    Editable details on an existing species image. Every field is optional —
+    the service writes only what was sent, so a partial submit cannot blank the
+    licensing data the ingestion pipeline filled in.
+    """
+
+    image_type = fields.Str(validate=validate.Length(min=1, max=50))
+    credit = fields.Str(allow_none=True, validate=validate.Length(max=500))
+    photographer = fields.Str(allow_none=True, validate=validate.Length(max=200))
+    license = fields.Str(allow_none=True, validate=validate.Length(max=100))
+    source = fields.Str(allow_none=True, validate=validate.Length(max=200))
+    source_page_url = fields.Str(allow_none=True, validate=validate.Length(max=1000))
+    capture_location = fields.Str(allow_none=True, validate=validate.Length(max=200))
+    capture_date = fields.Date(allow_none=True)
+
+
 class DistributionSchema(ma.Schema):
     state_id = fields.Int(required=True)
     abundance = fields.Str(
