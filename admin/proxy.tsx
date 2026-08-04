@@ -3,7 +3,7 @@
 // when pageExtensions excludes ".ts".
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_PATHS = ["/login"];
+const PUBLIC_PATHS = ["/login", "/admin/login"];
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -12,12 +12,12 @@ export function proxy(request: NextRequest) {
   const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
 
   if (isPublic) {
-    if (token) return NextResponse.redirect(new URL("/dashboard", request.url));
+    if (token) return NextResponse.redirect(new URL("/admin/dashboard", request.url));
     return NextResponse.next();
   }
 
   if (!token) {
-    const loginUrl = new URL("/login", request.url);
+    const loginUrl = new URL("/admin/login", request.url);
     loginUrl.searchParams.set("next", pathname);
     return NextResponse.redirect(loginUrl);
   }

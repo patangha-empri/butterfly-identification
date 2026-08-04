@@ -30,12 +30,21 @@ abstract class DioConfig {
   // If the PC's IP changes (DHCP), update it here.
   // Alternatives: emulator → http://10.0.2.2:5000 ; USB-only → http://localhost:5000 + adb reverse.
   // Loads from mobile/.env via --dart-define-from-file=.env
+  //
+  // NOTE: the default below is deliberately HTTPS. Release builds are
+  // HTTPS-only (android/app/src/debug/AndroidManifest.xml grants cleartext to
+  // debug builds only), so an http:// default silently breaks every API call in
+  // a release build rather than failing loudly at build time.
   static const String devBaseUrl = String.fromEnvironment(
     'API_URL',
-    defaultValue: 'http://staging.thirdeyegfx.in/butterfly_backend',
+    defaultValue: prodBaseUrl,
   );
-  static const String stagingBaseUrl = 'https://api.staging.butterflyindia.app';
-  static const String prodBaseUrl = 'https://api.butterflyindia.app';
+  static const String stagingBaseUrl =
+      'https://staging.thirdeyegfx.in/butterfly_backend';
+
+  // Production backend — Google Cloud Run (asia-south1).
+  static const String prodBaseUrl =
+      'https://butterfly-identification-392323252721.asia-south1.run.app';
 }
 
 class DioClient {

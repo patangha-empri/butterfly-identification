@@ -58,7 +58,7 @@ export function Header() {
   function handleLogout() {
     clearAuth();
     toast.success("Signed out successfully.");
-    router.push("/login");
+    window.location.href = "/admin/login";
   }
 
   const initials = user?.full_name

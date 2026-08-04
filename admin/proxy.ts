@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_PATHS = ["/login"];
+const PUBLIC_PATHS = ["/login", "/admin/login"];
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -10,13 +10,13 @@ export function proxy(request: NextRequest) {
 
   if (isPublic) {
     // Already authenticated — send to dashboard
-    if (token) return NextResponse.redirect(new URL("/", request.url));
+    if (token) return NextResponse.redirect(new URL("/admin/dashboard", request.url));
     return NextResponse.next();
   }
 
   // Protected route — require token
   if (!token) {
-    const loginUrl = new URL("/login", request.url);
+    const loginUrl = new URL("/admin/login", request.url);
     loginUrl.searchParams.set("next", pathname);
     return NextResponse.redirect(loginUrl);
   }
