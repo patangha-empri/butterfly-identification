@@ -1,3 +1,39 @@
+# Apache config for the static export on cPanel.
+#
+# There is no Node.js server here, so everything Next would normally do at
+# request time — proxy, redirects, dynamic route params — is handled by these
+# rewrites plus client-side code. Keep section 3 in sync with the detail routes
+# under app/(dashboard)/**/[id]/.
+#
+# next build copies this into out/; edit it here, never in out/.
+
+# ── Caching ──────────────────────────────────────────────────────────────────
+# LiteSpeed sends no Cache-Control for static files, only Last-Modified, which
+# leaves browsers free to *heuristically* cache the HTML entry documents. That
+# breaks every redeploy: a returning visitor keeps the previous build's app
+# shell while the server serves the new RSC payloads and chunk graph, and the
+# mismatch kills the render. Be explicit instead.
+<IfModule mod_headers.c>
+  # Entry documents and RSC payloads change on every deploy but keep the same
+  # URL, so they must be revalidated. no-cache still allows a 304 — it means
+  # "check with the server", not "never store".
+  <FilesMatch "\.(html|txt)$">
+    Header set Cache-Control "no-cache, must-revalidate"
+  </FilesMatch>
+
+  # Everything under _next/static is content-hashed: a change to the content
+  # produces a new filename, so these are safe to keep forever.
+  <FilesMatch "\.(js|css|woff2?)$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+
+  # public/ assets keep stable names (pathanga-logo.png), so they need
+  # revalidation or a logo swap would never reach returning users.
+  <FilesMatch "\.(png|jpe?g|gif|svg|ico|webp|avif)$">
+    Header set Cache-Control "public, max-age=86400, must-revalidate"
+  </FilesMatch>
+</IfModule>
+
 <IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteBase /admin/
@@ -11,8 +47,21 @@
   RewriteCond %{THE_REQUEST} ^[A-Z]{3,9}\ /admin/index\.html\ HTTP/
   RewriteRule ^index\.html$ /admin/ [R=301,L]
 
-  # 3. Dynamic Route Rewrites: Map dynamic browser URLs to our static Next.js templates
-  
+  # 3. Dynamic Route Rewrites: Map dynamic browser URLs to our static Next.js templates.
+  #    generateStaticParams() emits a single "id" template per route; the client
+  #    reads the true id back out of the URL via routeId() in lib/navigation.ts,
+  #    because the params the page receives always say "id".
+
+  # 3a. RSC payloads first, so client-side navigation stays a soft nav — without
+  #     these the router 404s on the payload and falls back to a full reload.
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteRule ^observations/[^/]+/index\.txt$ /admin/observations/id/index.txt [L]
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteRule ^species/[^/]+/index\.txt$ /admin/species/id/index.txt [L]
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteRule ^users/[^/]+/index\.txt$ /admin/users/id/index.txt [L]
+
+  # 3b. Document requests.
   # Rewrite /observations/:id to /admin/observations/id/index.html
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
@@ -37,6 +86,18 @@
   RewriteCond %{REQUEST_FILENAME} -d
   RewriteRule ^ - [L]
 
-  # 6. Fallback to custom 404
-  RewriteRule ^ /admin/404.html [L]
+  # 6. Anything reaching here genuinely does not exist. Stop rewriting and let
+  #    Apache issue a real 404 — ErrorDocument below still serves the styled
+  #    page, but with the correct status.
+  #
+  #    Do NOT rewrite to /admin/404.html here. An internal rewrite returns
+  #    HTTP 200 with an HTML body, so a request for a missing build asset
+  #    (e.g. a stale _next/static/<buildId>/_buildManifest.js referenced by a
+  #    cached document) hands the browser HTML where it expects JavaScript.
+  #    The router then dies on a parse error instead of degrading gracefully,
+  #    which surfaces as a blank "this page couldn't load" screen.
+  RewriteRule ^ - [L]
 </IfModule>
+
+# Styled 404 page, served with an honest 404 status.
+ErrorDocument 404 /admin/404.html

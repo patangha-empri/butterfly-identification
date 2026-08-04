@@ -1,7 +1,7 @@
 "use client";
 
-import { Suspense, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -9,7 +9,8 @@ import { toast } from "sonner";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 
 import api, { apiErrorMessage } from "@/lib/api";
-import { setTokens, setCurrentUser, isStaff } from "@/lib/auth";
+import { setTokens, setCurrentUser, isStaff, getToken } from "@/lib/auth";
+import { assetUrl, hardRedirect } from "@/lib/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,7 +32,6 @@ type LoginForm = z.infer<typeof loginSchema>;
 
 // Inner component uses useSearchParams — must be inside Suspense
 function LoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [showPassword, setShowPassword] = useState(false);
 
@@ -40,6 +40,12 @@ function LoginForm() {
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<LoginForm>({ resolver: zodResolver(loginSchema) });
+
+  // Already signed in? Skip the form. The proxy used to do this, but proxies
+  // don't run under a static export.
+  useEffect(() => {
+    if (getToken()) hardRedirect("/dashboard");
+  }, []);
 
   async function onSubmit(data: LoginForm) {
     try {
@@ -60,7 +66,7 @@ function LoginForm() {
       // Only follow internal paths — never absolute/protocol-relative URLs.
       const next = searchParams.get("next");
       const target = next && next.startsWith("/") && !next.startsWith("//") ? next : "/dashboard";
-      router.replace(target);
+      hardRedirect(target);
     } catch (err) {
       toast.error(apiErrorMessage(err));
     }
@@ -129,7 +135,7 @@ export default function LoginPage() {
         {/* Branding */}
         <div className="text-center space-y-2">
           <img
-            src="/admin/pathanga-logo.png"
+            src={assetUrl("/pathanga-logo.png")}
             alt="Pathanga — EMPRI"
             className="mx-auto h-20 w-auto"
           />

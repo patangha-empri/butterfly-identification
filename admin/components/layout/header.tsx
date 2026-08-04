@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter, usePathname } from "next/navigation";
-import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { AppLink } from "@/components/shared/app-link";
 import { Menu, LogOut, User as UserIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import { getCurrentUser, clearAuth } from "@/lib/auth";
+import { hardRedirect, normalizePath } from "@/lib/navigation";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -41,12 +42,12 @@ const PAGE_TITLES: Record<string, string> = {
 };
 
 function getPageTitle(pathname: string): string {
-  const segment = pathname.split("/")[1] ?? "";
+  // trailingSlash: true means usePathname() yields "/users/" — normalize first.
+  const segment = normalizePath(pathname).split("/")[1] ?? "";
   return PAGE_TITLES[segment] ?? "Dashboard";
 }
 
 export function Header() {
-  const router = useRouter();
   const pathname = usePathname();
   const [user, setUser] = useState<User | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -58,7 +59,7 @@ export function Header() {
   function handleLogout() {
     clearAuth();
     toast.success("Signed out successfully.");
-    window.location.href = "/admin/login/";
+    hardRedirect("/login");
   }
 
   const initials = user?.full_name
@@ -106,10 +107,10 @@ export function Header() {
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuItem asChild>
-            <Link href="/profile" className="gap-2">
+            <AppLink href="/profile" className="gap-2">
               <UserIcon size={14} />
               Profile
-            </Link>
+            </AppLink>
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem

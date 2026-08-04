@@ -1,6 +1,7 @@
 "use client";
 
 import { use, useState } from "react";
+import { usePathname } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -15,9 +16,10 @@ import {
   UserCheck,
   UserX,
 } from "lucide-react";
-import Link from "next/link";
+import { AppLink } from "@/components/shared/app-link";
 
 import api, { apiErrorMessage } from "@/lib/api";
+import { routeId } from "@/lib/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -51,7 +53,10 @@ const ACTION_STYLES: Record<string, { label: string; className: string }> = {
 };
 
 export default function UserDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
+  // See observations/[id]/page_client.tsx — params.id is the exported "id"
+  // placeholder; the real id comes from the rewritten URL.
+  const { id: fallbackId } = use(params);
+  const id = routeId(usePathname(), fallbackId);
   const qc = useQueryClient();
   const [warnOpen, setWarnOpen] = useState(false);
   const [flagOpen, setFlagOpen] = useState(false);
@@ -159,9 +164,9 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
     <div className="p-4 md:p-6 space-y-4">
       <div className="flex items-center gap-2">
         <Button variant="ghost" size="sm" asChild>
-          <Link href="/users">
+          <AppLink href="/users">
             <ArrowLeft size={14} className="mr-1" /> Users
-          </Link>
+          </AppLink>
         </Button>
       </div>
 
@@ -361,12 +366,12 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
                           {action.reason && <p className="mt-1">{action.reason}</p>}
                           {action.related_entity_type === "Observation" &&
                             action.related_entity_id && (
-                              <Link
+                              <AppLink
                                 href={`/observations/${action.related_entity_id}`}
                                 className="text-primary hover:underline mt-0.5 inline-block"
                               >
                                 View related observation →
-                              </Link>
+                              </AppLink>
                             )}
                         </div>
                         {revocable && (

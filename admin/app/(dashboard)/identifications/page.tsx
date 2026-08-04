@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import { CheckCircle2, Eye, Clock, Cpu, AlertCircle, BarChart3, Database, ChevronLeft, ChevronRight } from "lucide-react";
-import Link from "next/link";
+import { AppLink } from "@/components/shared/app-link";
 
 import api from "@/lib/api";
 import { SearchInput } from "@/components/shared/search-input";
@@ -130,12 +130,12 @@ export default function IdentificationsPage() {
                       <div className="min-w-0 flex flex-col justify-between py-0.5">
                         <div>
                           <div className="flex items-center gap-1.5 flex-wrap">
-                            <Link 
+                            <AppLink 
                               href={`/observations/${result.observation_id}`} 
                               className="text-sm font-semibold hover:underline truncate max-w-[180px] block"
                             >
                               {obs?.title || "Untitled Observation"}
-                            </Link>
+                            </AppLink>
                           </div>
                           <p className="text-xs text-muted-foreground truncate">
                             by @{obs?.user?.username || "anonymous"}
@@ -263,9 +263,9 @@ export default function IdentificationsPage() {
                       <div className="mt-3 flex items-center justify-between text-[9px] text-muted-foreground flex-wrap gap-2 pt-2 border-t border-border/60">
                         <span>Submitted {formatDistanceToNow(new Date(result.created_at), { addSuffix: true })}</span>
                         <Button variant="ghost" size="icon-xs" className="h-5 w-5 hover:bg-muted" asChild>
-                          <Link href={`/observations/${result.observation_id}`}>
+                          <AppLink href={`/observations/${result.observation_id}`}>
                             <Eye size={11} />
-                          </Link>
+                          </AppLink>
                         </Button>
                       </div>
                     </div>

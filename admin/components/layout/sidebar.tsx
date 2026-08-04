@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { AppLink } from "@/components/shared/app-link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
@@ -14,6 +14,7 @@ import {
   Radio,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { assetUrl, normalizePath } from "@/lib/navigation";
 
 // Binoculars might not be in lucide-react — fallback to Eye
 import { Eye } from "lucide-react";
@@ -36,16 +37,20 @@ interface SidebarProps {
 export function Sidebar({ className, onNavClick }: SidebarProps) {
   const pathname = usePathname();
 
+  // usePathname() strips the basePath but keeps the trailing slash that
+  // trailingSlash: true adds, so "/dashboard/" would never match "/dashboard".
+  const current = normalizePath(pathname);
+
   function isActive(href: string, exact?: boolean) {
-    if (exact) return pathname === href;
-    return pathname.startsWith(href);
+    if (exact) return current === href;
+    return current === href || current.startsWith(`${href}/`);
   }
 
   return (
     <aside className={cn("flex flex-col h-full bg-sidebar border-r border-sidebar-border", className)}>
       {/* Logo */}
       <div className="flex items-center gap-2.5 px-4 h-14 border-b border-sidebar-border shrink-0">
-        <img src="/admin/pathanga-logo.png" alt="Pathanga — EMPRI" className="h-9 w-auto" />
+        <img src={assetUrl("/pathanga-logo.png")} alt="Pathanga — EMPRI" className="h-9 w-auto" />
         <div>
           <p className="text-sm font-semibold text-sidebar-foreground leading-tight">Pathanga Admin</p>
           <p className="text-[10px] text-sidebar-foreground/50 leading-tight">EMPRI · Biodiversity Platform</p>
@@ -57,7 +62,7 @@ export function Sidebar({ className, onNavClick }: SidebarProps) {
         {navItems.map(({ href, label, icon: Icon, exact }) => {
           const active = isActive(href, exact);
           return (
-            <Link
+            <AppLink
               key={href}
               href={href}
               onClick={onNavClick}
@@ -81,7 +86,7 @@ export function Sidebar({ className, onNavClick }: SidebarProps) {
               {active && (
                 <ChevronRight size={14} className="text-sidebar-primary-foreground/60" />
               )}
-            </Link>
+            </AppLink>
           );
         })}
       </nav>

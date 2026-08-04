@@ -2,32 +2,69 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Eye } from "lucide-react";
-import Link from "next/link";
+import { Eye, EyeOff, Pencil, Plus, RotateCcw } from "lucide-react";
+import { AppLink } from "@/components/shared/app-link";
 
 import api from "@/lib/api";
 import { DataTable, type Column } from "@/components/shared/data-table";
 import { SearchInput } from "@/components/shared/search-input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { SpeciesForm } from "@/components/species/species-form";
+import { SpeciesStatusBadge } from "@/components/species/status-badge";
+import { SpeciesStatusDialog } from "@/components/species/status-dialog";
 import type { ApiResponse, Species, PaginationMeta } from "@/types";
+
+type StatusFilter = "all" | "active" | "inactive";
 
 export default function SpeciesPage() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
+  const [status, setStatus] = useState<StatusFilter>("all");
+  const [formOpen, setFormOpen] = useState(false);
+  const [editing, setEditing] = useState<Species | null>(null);
+  const [statusTarget, setStatusTarget] = useState<Species | null>(null);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["species", page, search],
+    queryKey: ["species", page, search, status],
     queryFn: async () => {
       const params = new URLSearchParams({
         page: String(page),
         per_page: "20",
         ...(search && { search }),
+        ...(status !== "all" && { status }),
       });
-      const res = await api.get<ApiResponse<Species[]>>(`/species/?${params}`);
+      // /admin/species/ rather than the public /species/ — the public endpoint
+      // filters is_active, so a deactivated species would vanish from the admin
+      // panel and could never be found again to reactivate it.
+      const res = await api.get<ApiResponse<Species[]>>(`/admin/species/?${params}`);
       return { species: res.data.data, meta: res.data.meta as PaginationMeta };
     },
   });
+
+  function openCreate() {
+    setEditing(null);
+    setFormOpen(true);
+  }
+
+  function openEdit(species: Species) {
+    setEditing(species);
+    setFormOpen(true);
+  }
 
   const columns: Column<Species>[] = [
     {
@@ -52,9 +89,9 @@ export default function SpeciesPage() {
       header: "Species",
       cell: (s) => (
         <div>
-          <Link href={`/species/${s.id}`} className="text-sm font-medium hover:underline">
+          <AppLink href={`/species/${s.id}`} className="text-sm font-medium hover:underline">
             {s.common_name}
-          </Link>
+          </AppLink>
           <p className="text-xs text-muted-foreground italic">{s.scientific_name}</p>
         </div>
       ),
@@ -65,14 +102,9 @@ export default function SpeciesPage() {
       cell: (s) => <span className="text-xs text-muted-foreground">{s.family}</span>,
     },
     {
-      key: "wingspan",
-      header: "Wingspan",
-      cell: (s) =>
-        s.wingspan_mm ? (
-          <span className="text-xs">{s.wingspan_mm}</span>
-        ) : (
-          <span className="text-xs text-muted-foreground">—</span>
-        ),
+      key: "app_status",
+      header: "App visibility",
+      cell: (s) => <SpeciesStatusBadge isActive={s.is_active} />,
     },
     {
       key: "status",
@@ -94,32 +126,79 @@ export default function SpeciesPage() {
     {
       key: "actions",
       header: "",
-      className: "w-10",
+      className: "w-28",
       cell: (s) => (
-        <Button variant="ghost" size="icon-sm" asChild title="View details">
-          <Link href={`/species/${s.id}`}>
-            <Eye size={14} />
-          </Link>
-        </Button>
+        <div className="flex items-center gap-0.5">
+          <Button variant="ghost" size="icon-sm" asChild title="View details">
+            <AppLink href={`/species/${s.id}`}>
+              <Eye size={14} />
+            </AppLink>
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            title="Edit species"
+            onClick={() => openEdit(s)}
+          >
+            <Pencil size={14} />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            title={
+              s.is_active === false
+                ? "Reactivate — show in the mobile app"
+                : "Set inactive — hide from the mobile app"
+            }
+            onClick={() => setStatusTarget(s)}
+          >
+            {s.is_active === false ? (
+              <RotateCcw size={14} className="text-green-600" />
+            ) : (
+              <EyeOff size={14} className="text-amber-600" />
+            )}
+          </Button>
+        </div>
       ),
     },
   ];
 
   return (
     <div className="p-4 md:p-6 space-y-4">
-      <div>
-        <h2 className="text-base font-semibold">Species</h2>
-        <p className="text-xs text-muted-foreground">
-          {data?.meta?.total?.toLocaleString() ?? "—"} species in database
-        </p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-base font-semibold">Species</h2>
+          <p className="text-xs text-muted-foreground">
+            {data?.meta?.total?.toLocaleString() ?? "—"} species
+            {status !== "all" && ` (${status})`}
+          </p>
+        </div>
+        <Button size="sm" onClick={openCreate}>
+          <Plus size={14} className="mr-1" /> Add species
+        </Button>
       </div>
 
-      <SearchInput
-        value={search}
-        onChange={(v) => { setSearch(v); setPage(1); }}
-        placeholder="Search common or scientific name…"
-        className="max-w-72"
-      />
+      <div className="flex flex-wrap items-center gap-2">
+        <SearchInput
+          value={search}
+          onChange={(v) => { setSearch(v); setPage(1); }}
+          placeholder="Search common or scientific name…"
+          className="max-w-72"
+        />
+        <Select
+          value={status}
+          onValueChange={(v) => { setStatus(v as StatusFilter); setPage(1); }}
+        >
+          <SelectTrigger className="w-44" aria-label="Filter by app visibility">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All species</SelectItem>
+            <SelectItem value="active">Active — in the app</SelectItem>
+            <SelectItem value="inactive">Inactive — hidden</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
 
       <DataTable
         columns={columns}
@@ -128,6 +207,29 @@ export default function SpeciesPage() {
         meta={data?.meta}
         onPageChange={setPage}
         emptyMessage="No species found."
+      />
+
+      <Dialog open={formOpen} onOpenChange={setFormOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>{editing ? "Edit species" : "Add species"}</DialogTitle>
+            <DialogDescription>
+              Only the four fields marked with * are required. Everything else can be
+              filled in now or later — sections are collapsed to keep this manageable.
+            </DialogDescription>
+          </DialogHeader>
+          <SpeciesForm
+            species={editing}
+            onSaved={() => setFormOpen(false)}
+            onCancel={() => setFormOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
+
+      <SpeciesStatusDialog
+        species={statusTarget}
+        open={Boolean(statusTarget)}
+        onOpenChange={(o) => !o && setStatusTarget(null)}
       />
     </div>
   );

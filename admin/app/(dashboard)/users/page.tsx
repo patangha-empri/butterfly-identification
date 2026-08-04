@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import { MoreHorizontal, UserCheck, UserX, ShieldCheck } from "lucide-react";
-import Link from "next/link";
+import { AppLink } from "@/components/shared/app-link";
 
 import api, { apiErrorMessage } from "@/lib/api";
 import { DataTable, type Column } from "@/components/shared/data-table";
@@ -94,9 +94,9 @@ export default function UsersPage() {
             </AvatarFallback>
           </Avatar>
           <div>
-            <Link href={`/users/${u.id}`} className="text-sm font-medium hover:underline">
+            <AppLink href={`/users/${u.id}`} className="text-sm font-medium hover:underline">
               {u.full_name}
-            </Link>
+            </AppLink>
             <p className="text-xs text-muted-foreground">{u.email}</p>
           </div>
         </div>
@@ -167,9 +167,9 @@ export default function UsersPage() {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-44">
             <DropdownMenuItem asChild>
-              <Link href={`/users/${u.id}`} className="gap-2">
+              <AppLink href={`/users/${u.id}`} className="gap-2">
                 <UserCheck size={13} /> View profile
-              </Link>
+              </AppLink>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem

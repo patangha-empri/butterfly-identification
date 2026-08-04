@@ -1,23 +1,27 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { getToken } from "@/lib/auth";
+import { hardRedirect } from "@/lib/navigation";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
 
+// This is the only route guard: proxy/middleware never runs under a static
+// export, so every protected page is gated here on the client instead.
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [authorized, setAuthorized] = useState(false);
+  const pathname = usePathname();
 
   useEffect(() => {
     const token = getToken();
     if (!token) {
-      if (typeof window !== "undefined") {
-        window.location.href = "/admin/login/";
-      }
+      // pathname is already basePath-free, which is what /login expects back.
+      hardRedirect(`/login?next=${encodeURIComponent(pathname)}`);
     } else {
       setAuthorized(true);
     }
-  }, []);
+  }, [pathname]);
 
   if (!authorized) {
     return null;

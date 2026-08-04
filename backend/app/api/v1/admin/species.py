@@ -4,6 +4,7 @@ from flask import Blueprint, request
 from app.schemas.admin import (
     SpeciesCreateSchema, SpeciesUpdateSchema,
     DistributionSchema, HostPlantSchema,
+    FieldDefinitionCreateSchema, FieldDefinitionUpdateSchema,
 )
 from app.services import species_service
 from app.services.species_service import SpeciesError
@@ -19,19 +20,89 @@ _create_schema = SpeciesCreateSchema()
 _update_schema = SpeciesUpdateSchema()
 _dist_schema = DistributionSchema()
 _plant_schema = HostPlantSchema()
+_field_def_create_schema = FieldDefinitionCreateSchema()
+_field_def_update_schema = FieldDefinitionUpdateSchema()
 
 
 @admin_species_bp.get("/")
 @admin_required
 def list_species():
+    """
+    Admin listing — includes deactivated species, unlike the public
+    GET /species/. Staff need to find and reactivate them; the admin panel
+    would otherwise lose a species the moment it was deactivated.
+    """
     page, per_page = get_pagination_params()
-    from app.supabase_client import get_supabase
-    from app.services.species_service import _SELECT, _to_dict
-    sb = get_supabase()
-    start = (page - 1) * per_page
-    res = sb.table("species").select(_SELECT, count="exact") \
-        .order("common_name").range(start, start + per_page - 1).execute()
-    return paginated_response([_to_dict(s) for s in res.data], res.count or 0, page, per_page)
+    filters = {
+        "search": request.args.get("search"),
+        "status": request.args.get("status"),  # active | inactive | omitted for all
+        "family": request.args.get("family"),
+        "conservation_status": request.args.get("conservation_status"),
+    }
+    items, total = species_service.list_species_admin(filters, page, per_page)
+    return paginated_response(items, total, page, per_page)
+
+
+@admin_species_bp.get("/field-definitions")
+@admin_required
+def list_field_definitions():
+    """The admin-defined field vocabulary behind species.custom_fields."""
+    include_retired = request.args.get("include_retired") == "true"
+    return success_response(data=species_service.list_field_definitions(include_retired))
+
+
+@admin_species_bp.post("/field-definitions")
+@admin_required
+def create_field_definition():
+    body = request.get_json(silent=True) or {}
+    errors = _field_def_create_schema.validate(body)
+    if errors:
+        return error_response("Validation failed.", 422, errors=errors)
+    data = _field_def_create_schema.load(body)
+    try:
+        definition = species_service.create_field_definition(data, get_jwt_identity())
+    except SpeciesError as e:
+        return error_response(e.message, e.status_code)
+    return success_response(data=definition, status_code=201)
+
+
+@admin_species_bp.patch("/field-definitions/<definition_id>")
+@admin_required
+def update_field_definition(definition_id):
+    body = request.get_json(silent=True) or {}
+    errors = _field_def_update_schema.validate(body)
+    if errors:
+        return error_response("Validation failed.", 422, errors=errors)
+    data = _field_def_update_schema.load(body)
+    try:
+        definition = species_service.update_field_definition(definition_id, data)
+    except SpeciesError as e:
+        return error_response(e.message, e.status_code)
+    return success_response(data=definition)
+
+
+@admin_species_bp.delete("/field-definitions/<definition_id>")
+@admin_required
+def retire_field_definition(definition_id):
+    """Retires the field from the picker. Values already stored are kept."""
+    try:
+        species_service.retire_field_definition(definition_id)
+    except SpeciesError as e:
+        return error_response(e.message, e.status_code)
+    return success_response(
+        message="Custom field retired. Values already saved on species are kept."
+    )
+
+
+@admin_species_bp.get("/<species_id>")
+@admin_required
+def get_species(species_id):
+    """Detail lookup that also resolves deactivated species (the public one won't)."""
+    try:
+        species = species_service.get_species_admin(species_id)
+    except SpeciesError as e:
+        return error_response(e.message, e.status_code)
+    return success_response(data=species)
 
 
 @admin_species_bp.post("/")
@@ -68,11 +139,29 @@ def update_species(species_id):
 @admin_species_bp.delete("/<species_id>")
 @admin_required
 def deactivate_species(species_id):
+    """
+    Soft delete: hides the species from the mobile app. The record and its
+    observations are untouched, and POST /<id>/activate reverses it.
+    """
     try:
         species_service.deactivate_species(species_id)
     except SpeciesError as e:
         return error_response(e.message, e.status_code)
-    return success_response(message="Species deactivated.")
+    return success_response(
+        message="Species deactivated. It is now hidden from the mobile app."
+    )
+
+
+@admin_species_bp.post("/<species_id>/activate")
+@admin_required
+def activate_species(species_id):
+    try:
+        species = species_service.activate_species(species_id)
+    except SpeciesError as e:
+        return error_response(e.message, e.status_code)
+    return success_response(
+        data=species, message="Species reactivated. It is visible in the mobile app again."
+    )
 
 
 # ── Images ─────────────────────────────────────────────────────────────────────

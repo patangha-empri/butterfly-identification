@@ -1,16 +1,31 @@
 "use client";
 
-import { use } from "react";
+import { use, useState } from "react";
+import { usePathname } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Bug, Leaf, Map as MapIcon, ShieldCheck } from "lucide-react";
-import Link from "next/link";
+import {
+  ArrowLeft, Bug, EyeOff, Leaf, Map as MapIcon, Pencil, RotateCcw, ShieldCheck,
+} from "lucide-react";
+import { AppLink } from "@/components/shared/app-link";
 
 import api from "@/lib/api";
+import { routeId } from "@/lib/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { SpeciesForm } from "@/components/species/species-form";
+import { SpeciesStatusBadge } from "@/components/species/status-badge";
+import { SpeciesStatusDialog } from "@/components/species/status-dialog";
+import { SpeciesDetailSections } from "@/components/species/detail-sections";
 import type { ApiResponse, Species } from "@/types";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -26,13 +41,21 @@ function InfoRow({ label, value }: { label: string; value?: React.ReactNode }) {
 }
 
 export default function SpeciesDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
+  // See observations/[id]/page_client.tsx — params.id is the exported "id"
+  // placeholder; the real id comes from the rewritten URL.
+  const { id: fallbackId } = use(params);
+  const id = routeId(usePathname(), fallbackId);
+
+  const [formOpen, setFormOpen] = useState(false);
+  const [statusOpen, setStatusOpen] = useState(false);
 
   const { data: species, isLoading } = useQuery({
     queryKey: ["species-detail", id],
     queryFn: async () => {
-      // No admin detail route exists; the public endpoint returns the full record.
-      const res = await api.get<ApiResponse<Species>>(`/species/${id}`);
+      // The admin detail route, not the public /species/:id — the public one
+      // filters is_active and would 404 on a deactivated species, leaving no way
+      // to open it and reactivate it.
+      const res = await api.get<ApiResponse<Species>>(`/admin/species/${id}`);
       return res.data.data;
     },
   });
@@ -57,11 +80,45 @@ export default function SpeciesDetailPage({ params }: { params: Promise<{ id: st
 
   return (
     <div className="p-4 md:p-6 space-y-4">
-      <Button variant="ghost" size="sm" asChild>
-        <Link href="/species">
-          <ArrowLeft size={14} className="mr-1" /> Species
-        </Link>
-      </Button>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" asChild>
+            <AppLink href="/species">
+              <ArrowLeft size={14} className="mr-1" /> Species
+            </AppLink>
+          </Button>
+          <SpeciesStatusBadge isActive={species.is_active} />
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => setFormOpen(true)}>
+            <Pencil size={14} className="mr-1" /> Edit
+          </Button>
+          <Button
+            variant={species.is_active === false ? "default" : "outline"}
+            size="sm"
+            onClick={() => setStatusOpen(true)}
+          >
+            {species.is_active === false ? (
+              <><RotateCcw size={14} className="mr-1" /> Reactivate</>
+            ) : (
+              <><EyeOff size={14} className="mr-1" /> Set inactive</>
+            )}
+          </Button>
+        </div>
+      </div>
+
+      {species.is_active === false && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
+          <p className="font-medium">This species is hidden from the mobile app.</p>
+          <p className="mt-0.5 text-amber-800">
+            It will not appear in species search, browsing or identification results.
+            Its {species.observation_count ?? 0} existing observation
+            {species.observation_count === 1 ? "" : "s"} are unaffected. Use{" "}
+            <strong>Reactivate</strong> to make it visible again.
+          </p>
+        </div>
+      )}
 
       <div className="grid md:grid-cols-3 gap-4">
         {/* Main info */}
@@ -182,6 +239,10 @@ export default function SpeciesDetailPage({ params }: { params: Promise<{ id: st
               </CardContent>
             </Card>
           )}
+
+          {/* Research columns and admin-defined fields. Renders nothing when the
+              record has none of them populated. */}
+          <SpeciesDetailSections species={species} />
         </div>
 
         {/* Facts sidebar */}
@@ -224,6 +285,29 @@ export default function SpeciesDetailPage({ params }: { params: Promise<{ id: st
           </Card>
         </div>
       </div>
+
+      <Dialog open={formOpen} onOpenChange={setFormOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Edit {species.common_name}</DialogTitle>
+            <DialogDescription>
+              Sections are collapsed by default — open the ones you need. Only the
+              four fields marked with * are required.
+            </DialogDescription>
+          </DialogHeader>
+          <SpeciesForm
+            species={species}
+            onSaved={() => setFormOpen(false)}
+            onCancel={() => setFormOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
+
+      <SpeciesStatusDialog
+        species={species}
+        open={statusOpen}
+        onOpenChange={setStatusOpen}
+      />
     </div>
   );
 }

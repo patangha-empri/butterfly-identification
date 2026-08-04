@@ -1,7 +1,15 @@
-// This file is intentionally left as a redirect.
-// app/page.tsx (non-grouped) always wins over app/(dashboard)/page.tsx for the "/" route
-// in Next.js 16, so the real dashboard lives at app/(dashboard)/dashboard/page.tsx → /dashboard.
-import { redirect } from "next/navigation";
+"use client";
+
+import { useEffect } from "react";
+import { hardRedirect } from "@/lib/navigation";
+
+// app/page.tsx (non-grouped) always wins over app/(dashboard)/page.tsx for the "/" route,
+// so the real dashboard lives at app/(dashboard)/dashboard/page.tsx → /dashboard.
+// Hard redirect for the same reasons as app/page.tsx.
 export default function Page() {
-  redirect("/dashboard");
+  useEffect(() => {
+    hardRedirect("/dashboard");
+  }, []);
+
+  return null;
 }

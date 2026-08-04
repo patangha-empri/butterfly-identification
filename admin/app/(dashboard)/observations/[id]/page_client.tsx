@@ -1,7 +1,7 @@
 "use client";
 
 import { use, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
@@ -22,9 +22,10 @@ import {
   User,
   XCircle,
 } from "lucide-react";
-import Link from "next/link";
+import { AppLink } from "@/components/shared/app-link";
 
 import api, { apiErrorMessage } from "@/lib/api";
+import { hardRedirect, routeId } from "@/lib/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -77,9 +78,12 @@ function InfoRow({ label, value }: { label: string; value?: React.ReactNode }) {
 }
 
 export default function ObservationDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
+  // The static export produces one template at /observations/id/ and .htaccess
+  // rewrites /observations/:id onto it, so params.id is always the literal
+  // "id" — the real value only exists in the address bar.
+  const { id: fallbackId } = use(params);
+  const id = routeId(usePathname(), fallbackId);
   const qc = useQueryClient();
-  const router = useRouter();
   const [editOpen, setEditOpen] = useState(false);
 
   const { data: obs, isLoading } = useQuery({
@@ -182,7 +186,7 @@ export default function ObservationDetailPage({ params }: { params: Promise<{ id
       api.delete(`/observations/${id}`, { data: reason ? { reason } : {} }),
     onSuccess: () => {
       toast.success("Observation deleted. The observer has been notified.");
-      router.push("/observations");
+      hardRedirect("/observations");
     },
     onError: (err) => toast.error(apiErrorMessage(err)),
   });
@@ -221,9 +225,9 @@ export default function ObservationDetailPage({ params }: { params: Promise<{ id
   return (
     <div className="p-4 md:p-6 space-y-4">
       <Button variant="ghost" size="sm" asChild>
-        <Link href="/observations">
+        <AppLink href="/observations">
           <ArrowLeft size={14} className="mr-1" /> Observations
-        </Link>
+        </AppLink>
       </Button>
 
       <div className="grid md:grid-cols-3 gap-4">
@@ -402,7 +406,7 @@ export default function ObservationDetailPage({ params }: { params: Promise<{ id
                     <Bug size={14} /> Species Insights
                   </CardTitle>
                   <Button variant="ghost" size="sm" asChild className="h-6 text-xs -mt-0.5">
-                    <Link href={`/species/${species.id}`}>View species →</Link>
+                    <AppLink href={`/species/${species.id}`}>View species →</AppLink>
                   </Button>
                 </div>
                 <p className="text-xs">
@@ -494,12 +498,12 @@ export default function ObservationDetailPage({ params }: { params: Promise<{ id
                 </Avatar>
                 <div className="min-w-0">
                   {obs.user_id ? (
-                    <Link
+                    <AppLink
                       href={`/users/${obs.user_id}`}
                       className="text-sm font-medium hover:underline block truncate"
                     >
                       {obs.user.full_name}
-                    </Link>
+                    </AppLink>
                   ) : (
                     <p className="text-sm font-medium truncate">{obs.user.full_name}</p>
                   )}
@@ -734,7 +738,7 @@ function UserChip({
   if (!user) return <span className="text-muted-foreground text-xs italic">Unknown user</span>;
   const initials = user.full_name?.slice(0, 2).toUpperCase() ?? "?";
   return (
-    <Link href={`/users/${user.id}`} className="flex items-center gap-2 group hover:opacity-80 transition-opacity">
+    <AppLink href={`/users/${user.id}`} className="flex items-center gap-2 group hover:opacity-80 transition-opacity">
       <Avatar className="size-7 shrink-0">
         <AvatarImage src={user.profile_image_url ?? undefined} />
         <AvatarFallback className="text-[10px]">{initials}</AvatarFallback>
@@ -748,7 +752,7 @@ function UserChip({
         )}
         {sub && <p className="text-[10px] text-muted-foreground leading-tight">{sub}</p>}
       </div>
-    </Link>
+    </AppLink>
   );
 }
 
@@ -855,14 +859,14 @@ function LikesAndComments({
                   <div key={comment.id} className="flex gap-3">
                     {/* Avatar */}
                     {comment.user ? (
-                      <Link href={`/users/${comment.user.id}`} className="shrink-0 hover:opacity-80">
+                      <AppLink href={`/users/${comment.user.id}`} className="shrink-0 hover:opacity-80">
                         <Avatar className="size-7">
                           <AvatarImage src={comment.user.profile_image_url ?? undefined} />
                           <AvatarFallback className="text-[10px]">
                             {comment.user.full_name?.slice(0, 2).toUpperCase() ?? "?"}
                           </AvatarFallback>
                         </Avatar>
-                      </Link>
+                      </AppLink>
                     ) : (
                       <div className="size-7 rounded-full bg-muted flex items-center justify-center shrink-0">
                         <User size={12} className="text-muted-foreground" />
@@ -873,12 +877,12 @@ function LikesAndComments({
                     <div className="flex-1 min-w-0 bg-muted/50 rounded-lg px-3 py-2">
                       <div className="flex items-baseline gap-2 mb-1">
                         {comment.user ? (
-                          <Link
+                          <AppLink
                             href={`/users/${comment.user.id}`}
                             className="text-xs font-semibold hover:underline truncate"
                           >
                             {comment.user.full_name ?? comment.user.username ?? "Unknown"}
-                          </Link>
+                          </AppLink>
                         ) : (
                           <span className="text-xs font-semibold text-muted-foreground">Unknown</span>
                         )}

@@ -91,6 +91,34 @@ export interface SpeciesDistribution {
   abundance?: string;
 }
 
+/**
+ * A field an admin invented, stored in species.custom_fields keyed by field_key.
+ * The definition lives in species_field_definitions so the same field means the
+ * same thing on every species (migration 004).
+ */
+export type CustomFieldType =
+  | "text"
+  | "textarea"
+  | "number"
+  | "boolean"
+  | "date"
+  | "url"
+  | "list";
+
+export interface SpeciesFieldDefinition {
+  id: string;
+  field_key: string;
+  label: string;
+  field_type: CustomFieldType;
+  help_text?: string | null;
+  group_name?: string;
+  sort_order?: number;
+  is_active?: boolean;
+  created_at?: string;
+}
+
+export type CustomFieldValue = string | number | boolean | string[] | null;
+
 export interface Species {
   id: string;
   common_name: string;
@@ -113,6 +141,72 @@ export interface Species {
   states?: string[];
   images?: SpeciesImage[];
   distribution_states?: SpeciesDistribution[];
+
+  // Controls mobile-app visibility. Public endpoints filter is_active=true, so
+  // this is only ever false when read through /admin/species/.
+  is_active?: boolean;
+  is_migratory?: boolean;
+  wing_span_min_mm?: number | null;
+  wing_span_max_mm?: number | null;
+  custom_fields?: Record<string, CustomFieldValue>;
+
+  // ── Research columns (migration 001) ────────────────────────────────────────
+  // Taxonomy
+  subfamily?: string | null;
+  tribe?: string | null;
+  species_epithet?: string | null;
+  subspecies?: string | null;
+  authority?: string | null;
+  taxon_year?: number | null;
+  accepted_name?: string | null;
+  synonyms?: string[];
+  taxonomic_notes?: string | null;
+  // Morphology / identification
+  identification_notes?: string | null;
+  male_description?: string | null;
+  female_description?: string | null;
+  upperside_description?: string | null;
+  underside_description?: string | null;
+  wing_pattern?: string | null;
+  wing_colour?: string | null;
+  body_colour?: string | null;
+  body_length_min_mm?: number | null;
+  body_length_max_mm?: number | null;
+  // Lifecycle
+  egg_description?: string | null;
+  larva_description?: string | null;
+  pupa_description?: string | null;
+  adult_description?: string | null;
+  life_cycle?: string | null;
+  flight_period?: string | null;
+  breeding_season?: string | null;
+  // Ecology
+  nectar_plants?: string[];
+  forest_type?: string | null;
+  altitude_min_m?: number | null;
+  altitude_max_m?: number | null;
+  behaviour?: string | null;
+  migration_notes?: string | null;
+  predators?: string | null;
+  // Distribution beyond india_states
+  countries?: string[];
+  protected_areas?: string[];
+  // Conservation
+  iucn_status?: string | null;
+  iucn_assessment_url?: string | null;
+  legal_protection?: string | null;
+  // Knowledge / references
+  interesting_facts?: string | null;
+  research_notes?: string | null;
+  citations?: string[];
+  source_urls?: string[];
+  // Provenance / quality. confidence_score arrives as a string — PostgREST
+  // serialises NUMERIC that way.
+  confidence_score?: string | number | null;
+  verification_status?: string | null;
+  last_verified?: string | null;
+  data_source?: string | null;
+  field_provenance?: Record<string, unknown> | null;
 }
 
 // ── Geography ──────────────────────────────────────────────────────────────────

@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import { MoreHorizontal, CheckCircle2, XCircle, Eye } from "lucide-react";
-import Link from "next/link";
+import { AppLink } from "@/components/shared/app-link";
 
 import api, { apiErrorMessage } from "@/lib/api";
 import { DataTable, type Column } from "@/components/shared/data-table";
@@ -118,9 +118,9 @@ export default function ObservationsPage() {
       header: "Observation",
       cell: (o) => (
         <div>
-          <Link href={`/observations/${o.id}`} className="text-sm font-medium hover:underline">
+          <AppLink href={`/observations/${o.id}`} className="text-sm font-medium hover:underline">
             {o.title || o.identified_species_name || "Untitled observation"}
-          </Link>
+          </AppLink>
           <p className="text-xs text-muted-foreground">
             by @{o.user?.username ?? "anonymous"}
             {o.state_name ? ` · ${o.state_name}` : ""}
@@ -188,9 +188,9 @@ export default function ObservationsPage() {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-44">
             <DropdownMenuItem asChild>
-              <Link href={`/observations/${o.id}`} className="gap-2">
+              <AppLink href={`/observations/${o.id}`} className="gap-2">
                 <Eye size={13} /> View details
-              </Link>
+              </AppLink>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem

@@ -1,6 +1,10 @@
 import axios, { type AxiosError } from "axios";
 import { getToken, clearAuth } from "./auth";
+import { hardRedirect, isOnPath } from "./navigation";
 
+// Every request goes straight from the browser to the Flask backend. The admin
+// panel ships as a static export on cPanel, so there is no Next.js server to
+// host route handlers or server actions — do not add app/**/route.ts here.
 const BASE_URL =
   (process.env.NEXT_PUBLIC_API_URL ??
     "https://staging.thirdeyegfx.in/butterfly_backend")
@@ -25,9 +29,7 @@ api.interceptors.response.use(
   (error: AxiosError) => {
     if (error.response?.status === 401) {
       clearAuth();
-      if (typeof window !== "undefined" && !window.location.pathname.startsWith("/admin/login")) {
-        window.location.href = "/admin/login/";
-      }
+      if (!isOnPath("/login")) hardRedirect("/login");
     }
     return Promise.reject(error);
   }
