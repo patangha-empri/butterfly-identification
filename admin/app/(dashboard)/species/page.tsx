@@ -56,6 +56,15 @@ export default function SpeciesPage() {
     },
   });
 
+  // `editing`/`statusTarget` are snapshots taken at click time, so they go stale
+  // as soon as a dialog mutates the species (uploading an image, toggling
+  // status). Prefer the row from the latest fetch and keep the snapshot only as
+  // a fallback for when a filter has since removed it from the page.
+  const live = (s: Species | null) =>
+    s ? (data?.species.find((row) => row.id === s.id) ?? s) : null;
+  const editingLive = live(editing);
+  const statusTargetLive = live(statusTarget);
+
   function openCreate() {
     setEditing(null);
     setFormOpen(true);
@@ -212,14 +221,14 @@ export default function SpeciesPage() {
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
           <DialogHeader>
-            <DialogTitle>{editing ? "Edit species" : "Add species"}</DialogTitle>
+            <DialogTitle>{editingLive ? "Edit species" : "Add species"}</DialogTitle>
             <DialogDescription>
               Only the four fields marked with * are required. Everything else can be
               filled in now or later — sections are collapsed to keep this manageable.
             </DialogDescription>
           </DialogHeader>
           <SpeciesForm
-            species={editing}
+            species={editingLive}
             onSaved={() => setFormOpen(false)}
             onCancel={() => setFormOpen(false)}
           />
@@ -227,7 +236,7 @@ export default function SpeciesPage() {
       </Dialog>
 
       <SpeciesStatusDialog
-        species={statusTarget}
+        species={statusTargetLive}
         open={Boolean(statusTarget)}
         onOpenChange={(o) => !o && setStatusTarget(null)}
       />

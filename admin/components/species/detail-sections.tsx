@@ -8,9 +8,23 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { SPECIES_SECTIONS } from "./field-specs";
-import type { ApiResponse, Species, SpeciesFieldDefinition } from "@/types";
+import type { ApiResponse, Citation, Species, SpeciesFieldDefinition } from "@/types";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/**
+ * The value a spec'd field actually holds on an API response.
+ *
+ * Everything maps name-for-name except the flight months: the column is
+ * `seasonal_appearance` (which is what writes use) but responses serialise it
+ * as `flight_months`, so reading by spec name alone always came back empty.
+ */
+function fieldValue(species: Species, spec: { name: string; kind: string }): unknown {
+  if (spec.kind === "months") {
+    return species.flight_months ?? species[spec.name as keyof Species];
+  }
+  return species[spec.name as keyof Species];
+}
 
 function isEmpty(value: unknown): boolean {
   if (value === null || value === undefined || value === "") return true;
@@ -32,12 +46,34 @@ function renderValue(value: unknown, kind: string) {
       </div>
     );
   }
+  if (kind === "citations" && Array.isArray(value)) {
+    return (
+      <ul className="space-y-0.5">
+        {(value as Citation[]).map((c, i) => (
+          <li key={`${c.source}-${i}`}>
+            {c.url ? (
+              <a
+                href={c.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:underline break-all"
+              >
+                {c.source}
+              </a>
+            ) : (
+              <span>{c.source}</span>
+            )}
+          </li>
+        ))}
+      </ul>
+    );
+  }
   if (Array.isArray(value)) {
     return (
       <div className="flex flex-wrap gap-1">
         {value.map((v, i) => (
-          <Badge key={`${v}-${i}`} variant="secondary" className="text-[10px] font-normal">
-            {String(v)}
+          <Badge key={`${String(v)}-${i}`} variant="secondary" className="text-[10px] font-normal">
+            {typeof v === "object" && v !== null ? JSON.stringify(v) : String(v)}
           </Badge>
         ))}
       </div>
@@ -83,9 +119,7 @@ export function SpeciesDetailSections({ species }: { species: Species }) {
   const sections = SPECIES_SECTIONS.filter((s) => s.id !== "basics")
     .map((section) => ({
       ...section,
-      populated: section.fields.filter(
-        (f) => !isEmpty(species[f.name as keyof Species])
-      ),
+      populated: section.fields.filter((f) => !isEmpty(fieldValue(species, f))),
     }))
     .filter((section) => section.populated.length > 0);
 
@@ -107,7 +141,7 @@ export function SpeciesDetailSections({ species }: { species: Species }) {
               <div key={field.name} className="grid gap-1 sm:grid-cols-3">
                 <p className="text-xs text-muted-foreground">{field.label}</p>
                 <div className="text-xs sm:col-span-2">
-                  {renderValue(species[field.name as keyof Species], field.kind)}
+                  {renderValue(fieldValue(species, field), field.kind)}
                 </div>
               </div>
             ))}

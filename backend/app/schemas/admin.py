@@ -15,6 +15,20 @@ IUCN_STATUSES = ["DD", "LC", "NT", "VU", "EN", "CR", "EW", "EX", "NE"]
 CUSTOM_FIELD_TYPES = ["text", "textarea", "number", "boolean", "date", "url", "list"]
 
 
+class CitationSchema(ma.Schema):
+    """
+    One entry of species.citations.
+
+    The column holds {source, url} objects, not strings — the research
+    ingestion pipeline records which database a fact came from alongside the
+    link. Typing it as a plain string list made every existing record fail
+    validation on save. `url` is optional: printed field guides have none.
+    """
+
+    source = fields.Str(required=True, validate=validate.Length(min=1, max=200))
+    url = fields.Str(allow_none=True, load_default=None, validate=validate.Length(max=1000))
+
+
 def _research_fields() -> dict:
     """
     The ~47 research columns added by migration 001, as Marshmallow fields.
@@ -78,7 +92,7 @@ def _research_fields() -> dict:
         # Knowledge / references
         "interesting_facts": text(),
         "research_notes": text(),
-        "citations": str_list(),
+        "citations": fields.List(fields.Nested(CitationSchema), allow_none=True),
         "source_urls": str_list(),
         # Provenance / quality
         "confidence_score": fields.Float(allow_none=True, validate=validate.Range(min=0, max=1)),

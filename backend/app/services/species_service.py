@@ -1,5 +1,6 @@
 """Species listing, filtering, and admin CRUD — via Supabase PostgREST."""
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 
 # pyrefly: ignore [missing-import]
@@ -81,7 +82,27 @@ def _observation_count(species_id: str) -> int:
     return res.count or 0
 
 
-def _to_dict(row: dict, include_related: bool = False) -> dict:
+def _observation_counts(species_ids: list) -> dict:
+    """
+    Observation counts for a whole page of species at once.
+
+    A COUNT per species is hard to avoid without a DB-side aggregate, but the
+    queries are independent, so issue them concurrently instead of one after
+    another. Serially this was ~20 round trips and made the admin species list
+    take about 8 seconds, which read as "the status toggle doesn't work" — the
+    row only updates once the list refetch lands.
+
+    get_supabase() is an lru_cache'd, process-wide client with no Flask context
+    of its own, so calling it from these worker threads is safe.
+    """
+    if not species_ids:
+        return {}
+    with ThreadPoolExecutor(max_workers=min(10, len(species_ids))) as pool:
+        counts = list(pool.map(_observation_count, species_ids))
+    return dict(zip(species_ids, counts))
+
+
+def _to_dict(row: dict, include_related: bool = False, observation_counts: dict = None) -> dict:
     wingspan = ""
     if row.get("wing_span_min_mm") and row.get("wing_span_max_mm"):
         wingspan = f"{row['wing_span_min_mm']}-{row['wing_span_max_mm']} mm"
@@ -110,7 +131,11 @@ def _to_dict(row: dict, include_related: bool = False) -> dict:
         "color_tags": row.get("color_tags") or [],
         "slug": row["slug"],
         "primary_image_url": primary_img["image_url"] if primary_img else None,
-        "observation_count": _observation_count(row["id"]),
+        "observation_count": (
+            observation_counts.get(row["id"], 0)
+            if observation_counts is not None
+            else _observation_count(row["id"])
+        ),
         # Needed by the admin panel to show and toggle app visibility. Public
         # reads are already filtered to is_active=True, so this is always true
         # for app clients.
@@ -140,9 +165,16 @@ def _to_dict(row: dict, include_related: bool = False) -> dict:
             for d in (row.get("species_india_distribution") or [])
             if d.get("india_states")
         ]
+        # id/thumbnail_url/image_type are additive (2026-08-04): the admin image
+        # manager needs the id to set a primary or delete, and had no way to
+        # address an individual image without it. `caption` stays for the mobile
+        # app and the read-only detail view, which already render it.
         data["images"] = [
             {
+                "id": img.get("id"),
                 "image_url": img["image_url"],
+                "thumbnail_url": img.get("thumbnail_url"),
+                "image_type": img.get("image_type"),
                 "caption": f"{row['common_name']} - {img.get('image_type')}",
                 "credit": img.get("credit"),
                 "is_primary": img.get("is_primary"),
@@ -200,7 +232,11 @@ def list_species_admin(filters: dict, page: int, per_page: int) -> tuple:
 
     start = (page - 1) * per_page
     res = query.order("common_name").range(start, start + per_page - 1).execute()
-    return [_to_dict(row, include_related=True) for row in res.data], res.count or 0
+    counts = _observation_counts([row["id"] for row in res.data])
+    return (
+        [_to_dict(row, include_related=True, observation_counts=counts) for row in res.data],
+        res.count or 0,
+    )
 
 
 def list_species(filters: dict, page: int, per_page: int) -> tuple:
@@ -236,7 +272,10 @@ def list_species(filters: dict, page: int, per_page: int) -> tuple:
     query = query.range(start, start + per_page - 1)
 
     res = query.execute()
-    items = [_to_dict(row, include_related=True) for row in res.data]
+    counts = _observation_counts([row["id"] for row in res.data])
+    items = [
+        _to_dict(row, include_related=True, observation_counts=counts) for row in res.data
+    ]
     return items, res.count or 0
 
 
@@ -549,10 +588,33 @@ def add_species_image(species_id: str, file_storage, image_type: str, credit: st
 
 def delete_species_image(species_id: str, image_id: str) -> None:
     sb = get_supabase()
-    existing = sb.table("species_images").select("id").eq("id", image_id).eq("species_id", species_id).execute()
+    existing = (
+        sb.table("species_images")
+        .select("id, is_primary")
+        .eq("id", image_id)
+        .eq("species_id", species_id)
+        .execute()
+    )
     if not existing.data:
         raise SpeciesError("Image not found.", 404)
     sb.table("species_images").delete().eq("id", image_id).eq("species_id", species_id).execute()
+
+    # Deleting the primary would otherwise leave the species with images but no
+    # primary, which blanks primary_image_url — so the app and every admin list
+    # show no thumbnail despite pictures existing. Promote the oldest survivor.
+    if existing.data[0].get("is_primary"):
+        remaining = (
+            sb.table("species_images")
+            .select("id")
+            .eq("species_id", species_id)
+            .order("created_at")
+            .limit(1)
+            .execute()
+        )
+        if remaining.data:
+            sb.table("species_images").update({"is_primary": True}).eq(
+                "id", remaining.data[0]["id"]
+            ).execute()
 
 
 def set_primary_image(species_id: str, image_id: str) -> dict:

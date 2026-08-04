@@ -7,14 +7,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 /**
- * Chip editor for the JSONB array columns — synonyms, nectar_plants, countries,
- * protected_areas, citations, source_urls, color_tags.
+ * Chip editor for the string JSONB array columns — synonyms, nectar_plants,
+ * countries, protected_areas, source_urls, color_tags.
  *
  * Entries are added one at a time rather than as comma-separated text, because
- * several of these legitimately contain commas (citations especially).
+ * several of these legitimately contain commas.
+ *
+ * Not for citations: those are {source, url} objects and have their own editor.
  */
 export function ListEditor({
-  value,
+  value: rawValue,
   onChange,
   placeholder = "Add an entry",
 }: {
@@ -23,6 +25,14 @@ export function ListEditor({
   placeholder?: string;
 }) {
   const [draft, setDraft] = useState("");
+
+  // These columns are free-form JSONB, so a row written by an ingestion script
+  // can hold objects even though the type says string[]. Rendering one as a
+  // React child throws and takes the whole page down with it, so coerce here
+  // rather than trust the annotation.
+  const value = (Array.isArray(rawValue) ? rawValue : []).map((entry) =>
+    typeof entry === "string" ? entry : JSON.stringify(entry)
+  );
 
   function add() {
     const entry = draft.trim();

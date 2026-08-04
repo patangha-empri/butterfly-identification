@@ -71,6 +71,8 @@ export interface UserStreak {
 // ── Species ────────────────────────────────────────────────────────────────────
 // Shape mirrors backend species_service._to_dict(include_related=True).
 export interface SpeciesImage {
+  /** Absent on the denormalised `primary_image` blob, present on `images[]`. */
+  id?: string;
   image_url: string;
   thumbnail_url?: string;
   image_type?: string;
@@ -89,6 +91,16 @@ export interface SpeciesDistribution {
   state_name?: string;
   state_code?: string;
   abundance?: string;
+}
+
+/**
+ * A reference backing a species record. Stored in the species.citations JSONB
+ * array as objects, not strings — the ingestion pipeline records where each
+ * fact came from, and flattening that to text would lose the link.
+ */
+export interface Citation {
+  source: string;
+  url?: string | null;
 }
 
 /**
@@ -198,7 +210,7 @@ export interface Species {
   // Knowledge / references
   interesting_facts?: string | null;
   research_notes?: string | null;
-  citations?: string[];
+  citations?: Citation[];
   source_urls?: string[];
   // Provenance / quality. confidence_score arrives as a string — PostgREST
   // serialises NUMERIC that way.

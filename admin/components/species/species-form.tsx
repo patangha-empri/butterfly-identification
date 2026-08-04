@@ -21,24 +21,44 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ListEditor } from "./list-editor";
+import { CitationsEditor } from "./citations-editor";
 import { CustomFieldsEditor } from "./custom-fields-editor";
+import { SpeciesImagesEditor } from "./images-editor";
 import {
   ALL_FIELD_SPECS,
   REQUIRED_FIELDS,
   SPECIES_SECTIONS,
   type FieldSpec,
 } from "./field-specs";
-import type { ApiResponse, CustomFieldValue, Species } from "@/types";
+import type { ApiResponse, Citation, CustomFieldValue, Species } from "@/types";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-type FormValues = Record<string, string | number | boolean | string[] | null | undefined>;
+type FormValues = Record<
+  string,
+  string | number | boolean | string[] | Citation[] | null | undefined
+>;
 
 function toDefaults(species?: Species | null): FormValues {
   const values: FormValues = {};
   for (const spec of ALL_FIELD_SPECS) {
-    const current = species?.[spec.name as keyof Species] as unknown;
-    if (spec.kind === "list" || spec.kind === "months") {
+    let current = species?.[spec.name as keyof Species] as unknown;
+
+    // The API serialises the seasonal_appearance column as `flight_months`,
+    // but writes still expect `seasonal_appearance`. Read from the response
+    // name or the month picker silently starts empty and saving wipes it.
+    if (spec.kind === "months") {
+      current = species?.flight_months ?? current;
+    }
+
+    if (spec.kind === "citations") {
+      values[spec.name] = Array.isArray(current)
+        ? (current as unknown[]).filter(
+            (c): c is Citation =>
+              typeof c === "object" && c !== null && "source" in c
+          )
+        : [];
+    } else if (spec.kind === "list" || spec.kind === "months") {
       values[spec.name] = Array.isArray(current) ? (current as string[]) : [];
     } else if (spec.kind === "switch") {
       values[spec.name] = current === true;
@@ -67,7 +87,7 @@ function toPayload(
   for (const spec of ALL_FIELD_SPECS) {
     const raw = values[spec.name];
 
-    if (spec.kind === "list" || spec.kind === "months") {
+    if (spec.kind === "list" || spec.kind === "months" || spec.kind === "citations") {
       payload[spec.name] = Array.isArray(raw) ? raw : [];
     } else if (spec.kind === "switch") {
       payload[spec.name] = raw === true;
@@ -122,6 +142,22 @@ export function SpeciesForm({
       return res.data.data;
     },
     onSuccess: (saved) => {
+      // Same reason as the status dialog: the list refetch takes a few seconds,
+      // so patch the cache first or an edit looks like it did not save.
+      if (isEdit) {
+        qc.setQueriesData<{ species: Species[] }>({ queryKey: ["species"] }, (old) =>
+          old && Array.isArray(old.species)
+            ? {
+                ...old,
+                species: old.species.map((s) => (s.id === saved.id ? { ...s, ...saved } : s)),
+              }
+            : old
+        );
+        qc.setQueriesData<Species>({ queryKey: ["species-detail"] }, (old) =>
+          old && old.id === saved.id ? { ...old, ...saved } : old
+        );
+      }
+
       toast.success(isEdit ? "Species updated." : `“${saved.common_name}” created.`);
       qc.invalidateQueries({ queryKey: ["species"] });
       qc.invalidateQueries({ queryKey: ["species-detail"] });
@@ -168,6 +204,20 @@ export function SpeciesForm({
           </div>
         </details>
       ))}
+
+      <div className="rounded-lg border bg-card p-4">
+        {isEdit && species ? (
+          <SpeciesImagesEditor species={species} />
+        ) : (
+          <>
+            <p className="text-sm font-medium">Images</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Create the species first, then reopen it to add images — an upload
+              has to attach to a saved record.
+            </p>
+          </>
+        )}
+      </div>
 
       <div className="rounded-lg border bg-card p-4">
         <CustomFieldsEditor values={customFields} onChange={setCustomFields} />
@@ -266,6 +316,17 @@ function FormField({
               value={Array.isArray(field.value) ? (field.value as string[]) : []}
               onChange={field.onChange}
               placeholder={`Add ${spec.label.toLowerCase()}`}
+            />
+          )}
+        />
+      ) : spec.kind === "citations" ? (
+        <Controller
+          name={spec.name}
+          control={control}
+          render={({ field }) => (
+            <CitationsEditor
+              value={Array.isArray(field.value) ? (field.value as Citation[]) : []}
+              onChange={field.onChange}
             />
           )}
         />

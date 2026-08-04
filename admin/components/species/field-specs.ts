@@ -15,7 +15,9 @@ export type FieldKind =
   | "select"
   | "switch"
   | "list"
-  | "months";
+  | "months"
+  /** species.citations — {source, url} objects, not strings. */
+  | "citations";
 
 export interface FieldSpec {
   name: string;
@@ -165,7 +167,7 @@ export const SPECIES_SECTIONS: SectionSpec[] = [
     fields: [
       { name: "interesting_facts", label: "Interesting facts", kind: "textarea", rows: 3, wide: true },
       { name: "research_notes", label: "Research notes", kind: "textarea", rows: 3, wide: true },
-      { name: "citations", label: "Citations", kind: "list", wide: true },
+      { name: "citations", label: "Citations", kind: "citations", wide: true, help: "Where this record's data came from. A source name is required; the link is optional." },
       { name: "source_urls", label: "Source URLs", kind: "list", wide: true },
       { name: "data_source", label: "Data source", kind: "text", help: "Where this record originated, e.g. GBIF." },
       { name: "verification_status", label: "Data verification", kind: "select", options: DATA_VERIFICATION_OPTIONS, help: "How well checked this record is — unrelated to observation verification." },

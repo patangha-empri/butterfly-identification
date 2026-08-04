@@ -48,6 +48,30 @@ export function SpeciesStatusDialog({
       }
     },
     onSuccess: () => {
+      const id = species!.id;
+      const isActive = !deactivating;
+
+      // Patch the cache before refetching so the badge flips immediately.
+      // Invalidation alone left the old value on screen for seconds — the admin
+      // list counts observations for every row, so its refetch is not instant —
+      // and that read as the toggle having done nothing. The invalidations below
+      // still run, so the server stays the source of truth; this only covers the
+      // gap. A row filtered out by the current status filter self-corrects when
+      // the refetch lands.
+      qc.setQueriesData<{ species: Species[] }>({ queryKey: ["species"] }, (old) =>
+        old && Array.isArray(old.species)
+          ? {
+              ...old,
+              species: old.species.map((s) =>
+                s.id === id ? { ...s, is_active: isActive } : s
+              ),
+            }
+          : old
+      );
+      qc.setQueriesData<Species>({ queryKey: ["species-detail"] }, (old) =>
+        old && old.id === id ? { ...old, is_active: isActive } : old
+      );
+
       toast.success(
         deactivating
           ? `“${species?.common_name}” is now hidden from the mobile app.`
