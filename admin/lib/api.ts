@@ -25,8 +25,8 @@ api.interceptors.response.use(
   (error: AxiosError) => {
     if (error.response?.status === 401) {
       clearAuth();
-      if (typeof window !== "undefined") {
-        window.location.href = "/admin/login";
+      if (typeof window !== "undefined" && !window.location.pathname.startsWith("/admin/login")) {
+        window.location.href = "/admin/login/";
       }
     }
     return Promise.reject(error);
