@@ -78,16 +78,25 @@ final similarSpeciesProvider =
 
 /// Labels and types for the admin-defined fields the app is allowed to show.
 ///
-/// Kept alive rather than autoDispose: the vocabulary is the same for every
-/// species, so re-fetching it on each detail page would be wasted requests. An
-/// empty list on failure simply hides the section — a species page must not
-/// fail over an optional block.
+/// Cached across species once it succeeds — the vocabulary is the same for
+/// every species, so re-fetching per detail page would be wasted requests.
+///
+/// A failure is deliberately NOT cached. The earlier version kept the empty
+/// list forever, so one flaky request at app start (the common case on mobile:
+/// the radio is still coming up) hid the section for the entire session, with
+/// no retry until the app was killed. Now only a real answer is kept alive and
+/// the next species page tries again.
 final speciesFieldDefinitionsProvider =
-    FutureProvider<List<SpeciesFieldDefinition>>(
+    FutureProvider.autoDispose<List<SpeciesFieldDefinition>>(
   (ref) async {
     try {
-      return await ref.read(speciesRemoteDataSourceProvider).fetchFieldDefinitions();
+      final definitions =
+          await ref.read(speciesRemoteDataSourceProvider).fetchFieldDefinitions();
+      ref.keepAlive();
+      return definitions;
     } catch (_) {
+      // Hides the section this time round; a species page must not fail over
+      // an optional block. Not kept alive, so the next one retries.
       return <SpeciesFieldDefinition>[];
     }
   },

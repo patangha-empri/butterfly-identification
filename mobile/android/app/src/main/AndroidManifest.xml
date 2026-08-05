@@ -5,10 +5,37 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
 
+    <!--
+        Google Maps needs to see whether the Google Maps app is installed before
+        it can hand a sighting over for turn-by-turn directions. On Android 11+
+        that requires declaring the intent, otherwise canLaunchUrl() always
+        answers false and the Navigate button would look broken.
+    -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="geo"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="https"/>
+        </intent>
+    </queries>
+
     <application
         android:label="Pathanga"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+
+        <!--
+            Injected by build.gradle.kts from android/maps.properties (git-ignored)
+            so the key is not committed. A missing key builds fine and shows a grey
+            map rather than failing the build — see docs/MAPS_SETUP.md.
+        -->
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="${MAPS_API_KEY}"/>
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

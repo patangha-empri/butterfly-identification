@@ -19,6 +19,18 @@ if (hasReleaseKeystore) {
     keystoreProperties.load(FileInputStream(keystorePropertiesFile))
 }
 
+// Google Maps key, read from android/maps.properties (git-ignored, see
+// maps.properties.example). Empty when absent: the build still succeeds and the
+// map renders grey, which is a far clearer failure than a Gradle error on a
+// machine that simply has not been set up yet.
+val mapsProperties = Properties()
+val mapsPropertiesFile = rootProject.file("maps.properties")
+if (mapsPropertiesFile.exists()) {
+    mapsProperties.load(FileInputStream(mapsPropertiesFile))
+}
+val mapsApiKey: String =
+    (mapsProperties["MAPS_API_KEY"] as String?) ?: System.getenv("MAPS_API_KEY") ?: ""
+
 android {
     namespace = "com.thardeye.butterfly_india"
     compileSdk = flutter.compileSdkVersion
@@ -42,6 +54,8 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+
+        manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
     }
 
     signingConfigs {

@@ -1,9 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../../../../core/router/app_routes.dart';
 import '../../../../core/theme/color_tokens.dart';
 import '../../../../core/theme/design_tokens.dart';
@@ -14,14 +13,33 @@ import '../../../../shared/widgets/states/empty_state.dart';
 import '../../../home/data/models/observation_summary.dart';
 import '../../../home/presentation/widgets/sighting_tile.dart';
 import '../../data/map_clusterer.dart';
+import '../../data/map_geometry.dart';
+import '../../data/map_marker_icons.dart';
 import '../map_providers.dart';
 
 /// ─────────────────────────────────────────────────────────────────────────────
-/// MAP SCREEN (Tab 2) — interactive India biodiversity map (OpenStreetMap)
+/// MAP SCREEN (Tab 2) — public sightings on Google Maps
+///
+/// Runs on the Maps SDK for Android/iOS. Everything billable beyond drawing the
+/// map is deliberately avoided:
+///   • directions are handed to the installed Google Maps app, not fetched from
+///     the Directions API (see NavigationLauncher);
+///   • no Places, Geocoding or Static Maps calls anywhere in the app;
+///   • sightings come from our own backend in one request, then are clustered
+///     on-device, so panning and zooming costs nothing.
+/// The remaining budget lever is the key restriction set in Cloud Console —
+/// see docs/MAPS_SETUP.md.
 /// ─────────────────────────────────────────────────────────────────────────────
 
 const _indiaCenter = LatLng(22.5, 79.0);
 const _indiaZoom = 4.2;
+
+/// Keeps the camera over India and its neighbours. A user who flings the map to
+/// the Atlantic sees no sightings and assumes the app is broken.
+final _indiaBounds = LatLngBounds(
+  southwest: const LatLng(5.0, 66.0),
+  northeast: const LatLng(37.5, 98.0),
+);
 
 class MapScreen extends ConsumerStatefulWidget {
   const MapScreen({super.key});
@@ -31,44 +49,182 @@ class MapScreen extends ConsumerStatefulWidget {
 }
 
 class _MapScreenState extends ConsumerState<MapScreen> {
-  final _mapController = MapController();
+  GoogleMapController? _controller;
+  final _icons = MapMarkerIcons(
+    pinColor: ColorTokens.brandAccent,
+    clusterColor: ColorTokens.brandPrimary,
+  );
   double _zoom = _indiaZoom;
+
+  /// Frame-to-fit runs once per screen. Re-fitting on every refresh would yank
+  /// the camera away from wherever the user had panned to.
+  bool _hasFittedToSightings = false;
+
+  /// Zoom the current marker set was clustered at. Re-clustering on every frame
+  /// of a pinch would rebuild hundreds of markers for no visible gain.
+  double _clusteredAtZoom = _indiaZoom;
+
+  Set<Marker> _markers = const {};
+  int _markerBuildToken = 0;
 
   @override
   void dispose() {
-    _mapController.dispose();
+    _controller?.dispose();
     super.dispose();
   }
 
-  void _onPositionChanged(MapPosition position, bool hasGesture) {
-    // Re-cluster only when the zoom level changes meaningfully.
-    final z = position.zoom;
-    if (z != null && (z - _zoom).abs() >= 0.5) {
-      setState(() => _zoom = z);
-    }
+  // ── Camera ────────────────────────────────────────────────────────────────
+
+  void _onCameraMove(CameraPosition position) => _zoom = position.zoom;
+
+  void _onCameraIdle() {
+    if ((_zoom - _clusteredAtZoom).abs() < 0.5) return;
+    _clusteredAtZoom = _zoom;
+    _rebuildMarkers();
   }
 
   Future<void> _goToMyLocation() async {
     unawaited(Haptics.light());
     final coords = await ref.read(userLocationProvider.future);
+    if (!mounted) return;
     if (coords == null) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Location unavailable. Enable GPS & permission.'),
-        ));
-      }
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Location unavailable. Enable GPS & permission.'),
+      ));
       return;
     }
-    _mapController.move(LatLng(coords.lat, coords.lng), 11);
-    setState(() => _zoom = 11);
+    _zoom = 11;
+    _clusteredAtZoom = 11;
+    await _controller?.animateCamera(
+      CameraUpdate.newLatLngZoom(LatLng(coords.lat, coords.lng), 11),
+    );
+    await _rebuildMarkers();
   }
+
+  // ── Markers ───────────────────────────────────────────────────────────────
+
+  /// Rebuilds the marker set for the current data and zoom.
+  ///
+  /// Async because each icon may need painting; a token guards against an older
+  /// build finishing after a newer one and putting stale markers back.
+  Future<void> _rebuildMarkers() async {
+    final token = ++_markerBuildToken;
+    final sightings =
+        ref.read(mapSightingsProvider).valueOrNull ?? const <ObservationSummary>[];
+    if (sightings.isEmpty) {
+      if (mounted && _markers.isNotEmpty) setState(() => _markers = const {});
+      return;
+    }
+
+    final byId = {for (final o in sightings) o.id: o};
+    final clusters = MapClusterer.cluster(
+      ref.read(mapClusterPointsProvider),
+      zoom: _clusteredAtZoom,
+    );
+
+    final dpr = MediaQuery.devicePixelRatioOf(context);
+    final built = <Marker>{};
+    for (final c in clusters) {
+      if (!isPlottableCoord(c.lat, c.lng)) continue;
+      final position = LatLng(c.lat, c.lng);
+
+      if (c.isCluster) {
+        final members = [
+          for (final p in c.points)
+            if (byId[p.id] != null) byId[p.id]!,
+        ];
+        built.add(Marker(
+          markerId: MarkerId('cluster-${c.lat}-${c.lng}-${c.count}'),
+          position: position,
+          icon: await _icons.cluster(c.count, devicePixelRatio: dpr),
+          anchor: const Offset(0.5, 0.5),
+          consumeTapEvents: true,
+          onTap: () => _openCluster(c, members),
+        ));
+      } else {
+        final obs = byId[c.single.id];
+        if (obs == null) continue;
+        built.add(Marker(
+          markerId: MarkerId(obs.id),
+          position: position,
+          icon: await _icons.single(devicePixelRatio: dpr),
+          // The pin's tip is the coordinate, not its middle.
+          anchor: const Offset(0.5, 1.0),
+          consumeTapEvents: true,
+          onTap: () => _openSighting(obs),
+        ));
+      }
+    }
+
+    if (!mounted || token != _markerBuildToken) return;
+    setState(() => _markers = built);
+  }
+
+  // ── Opening things ────────────────────────────────────────────────────────
+
+  /// A tap on a sighting goes straight to its page — what was photographed,
+  /// the notes, the identification. Directions live there too, for the people
+  /// who actually want to travel to it.
+  void _openSighting(ObservationSummary obs) {
+    unawaited(Haptics.selection());
+    context.push(AppRoutes.observationDetailPath(obs.id));
+  }
+
+  /// A tap on a cluster either zooms in far enough to break it apart, or — when
+  /// its sightings share (almost) the same coordinate — lists them.
+  ///
+  /// Zooming alone was not enough: several sightings logged at one spot, or
+  /// placed on the same state centroid because they carry no GPS, sit exactly
+  /// on top of each other. No zoom level separates those, so without the list
+  /// they were simply unreachable.
+  Future<void> _openCluster(
+    MapCluster cluster,
+    List<ObservationSummary> members,
+  ) async {
+    unawaited(Haptics.selection());
+
+    final bounds = MapGeometry.boundsOf(cluster.points);
+    if (bounds == null || !MapGeometry.isSpread(cluster.points)) {
+      _showClusterSheet(members);
+      return;
+    }
+
+    // Fitting the members' own bounds reveals exactly the area that was hidden,
+    // rather than a fixed +2 which can under- or overshoot wildly.
+    await _controller?.animateCamera(
+      CameraUpdate.newLatLngBounds(bounds, 72),
+    );
+    await _syncZoomFromCamera();
+    await _rebuildMarkers();
+  }
+
+  /// After an animation the camera picks its own zoom, so read it back rather
+  /// than trusting the value we asked for — otherwise the next re-cluster runs
+  /// at a zoom the map is not actually at.
+  Future<void> _syncZoomFromCamera() async {
+    final actual = await _controller?.getZoomLevel();
+    if (actual == null) return;
+    _zoom = actual;
+    _clusteredAtZoom = actual;
+  }
+
+  /// Frames every sighting on first load, so nothing sits off-screen waiting to
+  /// be discovered by panning.
+  Future<void> _fitToSightings(List<ObservationSummary> sightings) async {
+    final bounds = MapGeometry.boundsOf(ref.read(mapClusterPointsProvider));
+    if (bounds == null || _controller == null) return;
+    await _controller!.animateCamera(CameraUpdate.newLatLngBounds(bounds, 48));
+    await _syncZoomFromCamera();
+    await _rebuildMarkers();
+  }
+
+  // ── Sheets ────────────────────────────────────────────────────────────────
 
   /// The sheet is presented on the ROOT navigator (AppBottomSheet uses
   /// useRootNavigator: true), but this State's `context` sits inside the
   /// shell tab's navigator. A plain Navigator.of(context).pop() would pop the
   /// map page itself — the only page in that branch — crashing go_router.
-  void _closeSheet() =>
-      Navigator.of(context, rootNavigator: true).pop();
+  void _closeSheet() => Navigator.of(context, rootNavigator: true).pop();
 
   void _openFilter() {
     final currentPrivacy = ref.read(mapPrivacyFilterProvider);
@@ -85,30 +241,20 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             spacing: SpaceTokens.sm,
             runSpacing: SpaceTokens.sm,
             children: [
-              ChoiceChip(
-                label: const Text('Public Feed'),
-                selected: currentPrivacy == 'public',
-                onSelected: (_) {
-                  ref.read(mapPrivacyFilterProvider.notifier).state = 'public';
-                  _closeSheet();
-                },
-              ),
-              ChoiceChip(
-                label: const Text('My Private'),
-                selected: currentPrivacy == 'private',
-                onSelected: (_) {
-                  ref.read(mapPrivacyFilterProvider.notifier).state = 'private';
-                  _closeSheet();
-                },
-              ),
-              ChoiceChip(
-                label: const Text('All Sightings'),
-                selected: currentPrivacy == 'all',
-                onSelected: (_) {
-                  ref.read(mapPrivacyFilterProvider.notifier).state = 'all';
-                  _closeSheet();
-                },
-              ),
+              for (final option in const [
+                ('public', 'Public Feed'),
+                ('private', 'My Private'),
+                ('all', 'All Sightings'),
+              ])
+                ChoiceChip(
+                  label: Text(option.$2),
+                  selected: currentPrivacy == option.$1,
+                  onSelected: (_) {
+                    ref.read(mapPrivacyFilterProvider.notifier).state =
+                        option.$1;
+                    _closeSheet();
+                  },
+                ),
             ],
           ),
         ],
@@ -116,85 +262,99 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     );
   }
 
-  void _onClusterTap(MapCluster cluster, Map<String, ObservationSummary> byId) {
-    Haptics.selection();
-    if (cluster.isCluster) {
-      _mapController.move(LatLng(cluster.lat, cluster.lng), _zoom + 2);
-      setState(() => _zoom = _zoom + 2);
-    } else {
-      final obs = byId[cluster.single.id];
-      if (obs != null) _showSightingSheet(obs);
-    }
-  }
-
-  void _showSightingSheet(ObservationSummary obs) {
+  /// Every sighting stacked on one spot, each opening its own page. This is the
+  /// only way to reach sightings that share a coordinate.
+  void _showClusterSheet(List<ObservationSummary> members) {
     AppBottomSheet.show(
       context,
-      title: 'Sighting',
-      scrollable: false,
-      child: SightingTile(
-        observation: obs,
-        onTap: () {
-          _closeSheet();
-          context.push(AppRoutes.observationDetailPath(obs.id));
-        },
+      title: '${members.length} sightings here',
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (final obs in members)
+            Padding(
+              padding: const EdgeInsets.only(bottom: SpaceTokens.sm),
+              child: SightingTile(
+                observation: obs,
+                onTap: () {
+                  _closeSheet();
+                  context.push(AppRoutes.observationDetailPath(obs.id));
+                },
+              ),
+            ),
+        ],
       ),
     );
   }
 
+  // ── Build ─────────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
-    final sightingsAsync = ref.watch(mapSightingsProvider);
-    final points = ref.watch(mapClusterPointsProvider);
-    final sightings = sightingsAsync.valueOrNull ?? const <ObservationSummary>[];
-    final byId = {for (final o in sightings) o.id: o};
-    final clusters = MapClusterer.cluster(points, zoom: _zoom);
-    
-    final activeFilter = ref.watch(mapStateFilterProvider) != null;
-    final privacy = ref.watch(mapPrivacyFilterProvider);
-    final activePrivacyFilter = privacy != 'public';
-    final active = activeFilter || activePrivacyFilter;
+    // Rebuild markers whenever the sighting set changes (filter, refresh, first
+    // load) without doing it inside build().
+    ref.listen(mapSightingsProvider, (_, next) {
+      final loaded = next.valueOrNull;
+      if (loaded != null && loaded.isNotEmpty && !_hasFittedToSightings) {
+        _hasFittedToSightings = true;
+        _fitToSightings(loaded);
+      } else {
+        _rebuildMarkers();
+      }
+    });
 
-    final privacyLabel = privacy == 'public'
-        ? 'public'
-        : privacy == 'private'
-            ? 'private'
-            : 'total';
+    final sightingsAsync = ref.watch(mapSightingsProvider);
+    final sightings = sightingsAsync.valueOrNull ?? const <ObservationSummary>[];
+
+    final activeStateFilter = ref.watch(mapStateFilterProvider) != null;
+    final privacy = ref.watch(mapPrivacyFilterProvider);
+    final active = activeStateFilter || privacy != 'public';
+
+    final privacyLabel = switch (privacy) {
+      'public' => 'public',
+      'private' => 'private',
+      _ => 'total',
+    };
 
     return Scaffold(
       body: Stack(
         children: [
-          FlutterMap(
-            mapController: _mapController,
-            options: MapOptions(
-              initialCenter: _indiaCenter,
-              initialZoom: _indiaZoom,
-              minZoom: 3,
-              maxZoom: 18,
-              onPositionChanged: _onPositionChanged,
+          GoogleMap(
+            initialCameraPosition: const CameraPosition(
+              target: _indiaCenter,
+              zoom: _indiaZoom,
             ),
-            children: [
-              TileLayer(
-                urlTemplate:
-                    'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                userAgentPackageName: 'com.thardeye.butterfly_india',
-              ),
-              MarkerLayer(
-                markers: [
-                  for (final c in clusters)
-                    if (isPlottableCoord(c.lat, c.lng))
-                      Marker(
-                        point: LatLng(c.lat, c.lng),
-                        width: c.isCluster ? 48 : 40,
-                        height: c.isCluster ? 48 : 40,
-                        child: _ClusterMarker(
-                          cluster: c,
-                          onTap: () => _onClusterTap(c, byId),
-                        ),
-                      ),
-                ],
-              ),
-            ],
+            markers: _markers,
+            onMapCreated: (controller) {
+              _controller = controller;
+              // Data may already be loaded by the time the platform view is
+              // ready, in which case no provider change will fire.
+              final loaded = ref.read(mapSightingsProvider).valueOrNull;
+              if (loaded != null && loaded.isNotEmpty && !_hasFittedToSightings) {
+                _hasFittedToSightings = true;
+                _fitToSightings(loaded);
+              } else {
+                _rebuildMarkers();
+              }
+            },
+            onCameraMove: _onCameraMove,
+            onCameraIdle: _onCameraIdle,
+            cameraTargetBounds: CameraTargetBounds(_indiaBounds),
+            minMaxZoomPreference: const MinMaxZoomPreference(3, 17),
+            // The blue dot is drawn only after the user asks for it via the
+            // locate button, so opening the map never triggers a GPS prompt.
+            myLocationEnabled: false,
+            myLocationButtonEnabled: false,
+            // Chrome we replace with our own controls, plus layers that cost
+            // frames on low-end devices and add nothing to a sightings map.
+            zoomControlsEnabled: false,
+            mapToolbarEnabled: false,
+            compassEnabled: false,
+            trafficEnabled: false,
+            buildingsEnabled: false,
+            indoorViewEnabled: false,
+            tiltGesturesEnabled: false,
+            rotateGesturesEnabled: false,
           ),
 
           // ── Top bar (title + filter) ─────────────────────────────────────
@@ -258,47 +418,6 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           ),
         ],
       ),
-    );
-  }
-}
-
-// ── Marker widgets ────────────────────────────────────────────────────────────
-
-class _ClusterMarker extends StatelessWidget {
-  const _ClusterMarker({required this.cluster, required this.onTap});
-  final MapCluster cluster;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    if (cluster.isCluster) {
-      return GestureDetector(
-        onTap: onTap,
-        child: Container(
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: ColorTokens.brandPrimary,
-            border: Border.all(color: Colors.white, width: 2),
-            boxShadow: ShadowTokens.md,
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            cluster.count > 99 ? '99+' : '${cluster.count}',
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w700,
-              fontSize: 13,
-            ),
-          ),
-        ),
-      );
-    }
-    return GestureDetector(
-      onTap: onTap,
-      child: const Icon(Icons.location_on,
-          color: ColorTokens.brandAccent, size: 38, shadows: [
-        Shadow(color: Colors.black45, blurRadius: 4, offset: Offset(0, 2)),
-      ]),
     );
   }
 }

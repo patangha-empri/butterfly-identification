@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:butterfly_india/features/species/data/models/species_detail.dart';
 import 'package:butterfly_india/features/species/data/models/species_filter.dart';
 import 'package:butterfly_india/features/species/presentation/providers/species_providers.dart';
 import '../../helpers/test_helpers.dart';
@@ -105,6 +106,52 @@ void main() {
       final similar =
           await container.read(similarSpeciesProvider('sp-1').future);
       expect(similar, hasLength(2));
+    });
+  });
+
+  group('speciesFieldDefinitionsProvider', () {
+    test('caches a successful fetch across species pages', () async {
+      remote.fieldDefinitions = const [
+        SpeciesFieldDefinition(fieldKey: 'wing_texture', label: 'Wing texture'),
+      ];
+      final container = build();
+      addTearDown(container.dispose);
+
+      final first =
+          container.listen(speciesFieldDefinitionsProvider.future, (_, __) {});
+      expect(await first.read(), hasLength(1));
+      first.close();
+
+      // A second page must reuse the answer rather than hit the network again.
+      final calls = remote.fieldDefinitionCalls;
+      final second =
+          container.listen(speciesFieldDefinitionsProvider.future, (_, __) {});
+      await second.read();
+      expect(remote.fieldDefinitionCalls, calls);
+    });
+
+    test('retries after a failure instead of caching the empty result',
+        () async {
+      // The bug this pins: one flaky request at app start used to hide the
+      // custom fields section for the whole session.
+      remote.fail = true;
+      final container = build();
+      addTearDown(container.dispose);
+
+      final failed =
+          container.listen(speciesFieldDefinitionsProvider.future, (_, __) {});
+      expect(await failed.read(), isEmpty);
+      failed.close();
+      // autoDispose tears down on the next tick, not synchronously on close.
+      await Future<void>.delayed(Duration.zero);
+
+      remote.fail = false;
+      remote.fieldDefinitions = const [
+        SpeciesFieldDefinition(fieldKey: 'wing_texture', label: 'Wing texture'),
+      ];
+      final retried =
+          container.listen(speciesFieldDefinitionsProvider.future, (_, __) {});
+      expect(await retried.read(), hasLength(1));
     });
   });
 }

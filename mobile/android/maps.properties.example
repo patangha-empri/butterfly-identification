@@ -1,0 +1,7 @@
+# Copy to android/maps.properties and fill in the Android Maps SDK key.
+# Restrict the key in Google Cloud Console to:
+#   Application restriction : Android apps
+#   Package name            : com.thardeye.butterfly_india
+#   SHA-1                   : your debug + upload signing certificates
+#   API restriction         : Maps SDK for Android only
+MAPS_API_KEY=

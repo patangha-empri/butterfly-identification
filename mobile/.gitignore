@@ -8,6 +8,11 @@ android/key.properties
 *.jks
 *.keystore
 
+# Google Maps keys — shipped inside the binary, but kept out of git so the
+# repository itself never publishes them. Templates are committed.
+android/maps.properties
+ios/Flutter/Secrets.xcconfig
+
 # Miscellaneous
 *.class
 *.log

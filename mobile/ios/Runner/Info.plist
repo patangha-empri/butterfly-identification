@@ -53,5 +53,15 @@
 		<string>Butterfly India uses your location to tag where a butterfly was seen and show nearby sightings on the map.</string>
 		<key>UIStatusBarHidden</key>
 		<false/>
+		<!-- Google Maps key, supplied by ios/Flutter/Secrets.xcconfig at build
+		     time and read by AppDelegate. Never hard-code it here. -->
+		<key>MapsApiKey</key>
+		<string>$(MAPS_API_KEY)</string>
+		<!-- Required before canOpenURL() will admit the Google Maps app exists;
+		     without it the Navigate button silently falls back to the browser. -->
+		<key>LSApplicationQueriesSchemes</key>
+		<array>
+			<string>comgooglemaps</string>
+		</array>
 	</dict>
 </plist>

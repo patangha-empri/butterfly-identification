@@ -5,11 +5,14 @@
 abstract class AppConstants {
   // ── App metadata ──────────────────────────────────────────────────────────
   static const String appName = 'Pathanga';
-  static const String appVersion = '1.0.0';
-  static const String supportEmail = 'support@butterflyindia.app';
-  static const String websiteUrl = 'https://butterflyindia.app';
-  static const String privacyUrl = 'https://butterflyindia.app/privacy';
-  static const String termsUrl = 'https://butterflyindia.app/terms';
+  static const String appVersion = '1.0.1';
+  // butterflyindia.app was a placeholder that never existed — the domain does
+  // not resolve. Everything public lives on pathanga.com; the trailing slashes
+  // match the landing site's static export, which 301s without them.
+  static const String supportEmail = 'pathangaempri@gmail.com';
+  static const String websiteUrl = 'https://pathanga.com';
+  static const String privacyUrl = 'https://pathanga.com/privacy/';
+  static const String termsUrl = 'https://pathanga.com/terms/';
 
   // ── Pagination ────────────────────────────────────────────────────────────
   static const int defaultPageSize = 20;

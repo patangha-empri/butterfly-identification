@@ -18,6 +18,7 @@ import '../../../species/presentation/providers/species_providers.dart';
 import '../../../species/data/models/species_detail.dart';
 import '../../../../core/utils/a11y.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../maps/data/navigation_launcher.dart';
 import '../../data/models/observation.dart';
 import '../providers/observation_providers.dart';
 
@@ -106,6 +107,9 @@ class ObservationDetailScreen extends ConsumerWidget {
               ),
             ),
           ),
+          // Directions belong on the sighting, not on the map pin: you decide
+          // to travel somewhere after reading what was found there.
+          if (_hasCoords(obs)) _NavigateButton(obs: obs),
         ],
       ),
 
@@ -139,6 +143,54 @@ class ObservationDetailScreen extends ConsumerWidget {
 }
 
 /// Like + comment actions for an observation detail.
+/// A sighting can only be navigated to when it carries a usable GPS fix —
+/// records placed at a state centroid would send someone to a field in the
+/// middle of the state.
+bool _hasCoords(Observation obs) {
+  final lat = obs.latitude;
+  final lng = obs.longitude;
+  return lat != null &&
+      lng != null &&
+      lat.isFinite &&
+      lng.isFinite &&
+      lat.abs() <= 90 &&
+      lng.abs() <= 180 &&
+      !(lat == 0 && lng == 0);
+}
+
+/// Opens the device's maps app for turn-by-turn directions. Never calls the
+/// billable Directions API — see NavigationLauncher.
+class _NavigateButton extends StatelessWidget {
+  const _NavigateButton({required this.obs});
+
+  final Observation obs;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextButton.icon(
+      icon: const Icon(Icons.directions_outlined, size: 18),
+      label: const Text('Navigate'),
+      style: TextButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: SpaceTokens.sm),
+        visualDensity: VisualDensity.compact,
+      ),
+      onPressed: () async {
+        final messenger = ScaffoldMessenger.of(context);
+        final opened = await const NavigationLauncher().navigateTo(
+          lat: obs.latitude!,
+          lng: obs.longitude!,
+          label: obs.title ?? obs.locationName,
+        );
+        if (!opened) {
+          messenger.showSnackBar(const SnackBar(
+            content: Text('No maps app available to open directions.'),
+          ));
+        }
+      },
+    );
+  }
+}
+
 class _SocialBar extends StatelessWidget {
   const _SocialBar({required this.obs});
   final Observation obs;

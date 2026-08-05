@@ -85,8 +85,12 @@ class FakeSpeciesRemoteDataSource implements ISpeciesRemoteDataSource {
   /// default so existing tests see the detail page without the extra section.
   List<SpeciesFieldDefinition> fieldDefinitions = const [];
 
+  /// Counts requests so tests can assert the vocabulary is fetched once.
+  int fieldDefinitionCalls = 0;
+
   @override
   Future<List<SpeciesFieldDefinition>> fetchFieldDefinitions() async {
+    fieldDefinitionCalls++;
     if (fail) throw Exception('network');
     return fieldDefinitions;
   }
