@@ -1,9 +1,10 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
-import { Info } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Info, Loader2, X } from "lucide-react";
+import { toast } from "sonner";
 
-import api from "@/lib/api";
+import api, { apiErrorMessage } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -105,14 +106,32 @@ function renderValue(value: unknown, kind: string) {
  * a fraction of ~60 columns, and rendering rows of dashes buries the real data.
  */
 export function SpeciesDetailSections({ species }: { species: Species }) {
+  const qc = useQueryClient();
+
+  // Retired definitions included: a species can still hold a value for a field
+  // that was switched off, and the row below labels it rather than hiding it.
   const { data: definitions = [] } = useQuery({
-    queryKey: ["species-field-definitions"],
+    queryKey: ["species-field-definitions", "with-retired"],
     queryFn: async () => {
       const res = await api.get<ApiResponse<SpeciesFieldDefinition[]>>(
-        "/admin/species/field-definitions"
+        "/admin/species/field-definitions?include_retired=true"
       );
       return res.data.data;
     },
+  });
+
+  const clearMutation = useMutation({
+    mutationFn: async (fieldKey: string) => {
+      const res = await api.delete<ApiResponse<Species>>(
+        `/admin/species/${species.id}/custom-fields/${fieldKey}`
+      );
+      return res.data;
+    },
+    onSuccess: (body) => {
+      toast.success(body.message ?? "Field cleared on this species.");
+      qc.invalidateQueries({ queryKey: ["species-detail", species.id] });
+    },
+    onError: (err) => toast.error(apiErrorMessage(err)),
   });
 
   // "Basics" is already rendered by the page header, so skip it here.
@@ -181,8 +200,25 @@ export function SpeciesDetailSections({ species }: { species: Species }) {
                       <span className="ml-1 text-[10px] text-amber-700">(retired)</span>
                     )}
                   </p>
-                  <div className="text-xs sm:col-span-2">
-                    {renderValue(value, def?.field_type ?? "text")}
+                  <div className="flex items-start justify-between gap-2 text-xs sm:col-span-2">
+                    <div className="min-w-0">
+                      {renderValue(value, def?.field_type ?? "text")}
+                    </div>
+                    {/* Clears this one species only — the field and every other
+                        species are untouched. */}
+                    <button
+                      type="button"
+                      disabled={clearMutation.isPending}
+                      onClick={() => clearMutation.mutate(key)}
+                      className="inline-flex shrink-0 items-center gap-0.5 text-[10px] text-muted-foreground hover:text-destructive disabled:opacity-50"
+                    >
+                      {clearMutation.isPending && clearMutation.variables === key ? (
+                        <Loader2 size={10} className="animate-spin" />
+                      ) : (
+                        <X size={10} />
+                      )}
+                      remove
+                    </button>
                   </div>
                 </div>
               );

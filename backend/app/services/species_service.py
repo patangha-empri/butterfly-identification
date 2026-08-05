@@ -497,13 +497,139 @@ def _field_definition_to_dict(row: dict) -> dict:
     }
 
 
-def list_field_definitions(include_retired: bool = False) -> list:
+def _is_empty_value(value) -> bool:
+    """
+    What counts as "this species has no value for the field".
+
+    Mirrors the admin form, which writes null rather than an empty string when a
+    field is cleared — but older rows can still hold "" or [], and those must not
+    be reported as usage or the delete dialog would list species with nothing in
+    them.
+    """
+    if value is None:
+        return True
+    if isinstance(value, str):
+        return value.strip() == ""
+    if isinstance(value, (list, dict)):
+        return len(value) == 0
+    return False
+
+
+def _species_holding_field(field_key: str) -> list:
+    """
+    Every species with a non-empty value under `field_key`, newest data first.
+
+    Scans in pages rather than filtering server-side: PostgREST cannot express
+    "key exists and is non-empty" for JSONB without a stored function, and the
+    species table is a curated catalogue of hundreds of rows, not a data feed.
+    """
+    sb = get_supabase()
+    holders, offset, page = [], 0, 1000
+    while True:
+        res = (
+            sb.table("species")
+            .select("id, common_name, scientific_name, custom_fields")
+            .order("common_name")
+            .range(offset, offset + page - 1)
+            .execute()
+        )
+        rows = res.data or []
+        for row in rows:
+            value = (row.get("custom_fields") or {}).get(field_key)
+            if not _is_empty_value(value):
+                holders.append({
+                    "id": row["id"],
+                    "common_name": row.get("common_name"),
+                    "scientific_name": row.get("scientific_name"),
+                    "value": value,
+                })
+        if len(rows) < page:
+            return holders
+        offset += page
+
+
+def _strip_field(species_ids: list, field_key: str) -> int:
+    """
+    Remove `field_key` from the custom_fields of the given species.
+
+    Read-modify-write per species: the whole JSONB column has to be rewritten
+    because PostgREST has no "delete one key" operation. Species that never held
+    the key are skipped so their updated_at is not disturbed.
+    """
+    sb = get_supabase()
+    now = datetime.now(timezone.utc).isoformat()
+    cleared = 0
+    for species_id in species_ids:
+        res = sb.table("species").select("custom_fields").eq("id", species_id).execute()
+        if not res.data:
+            continue
+        current = res.data[0].get("custom_fields") or {}
+        if field_key not in current:
+            continue
+        current.pop(field_key)
+        sb.table("species").update(
+            {"custom_fields": current, "updated_at": now}
+        ).eq("id", species_id).execute()
+        cleared += 1
+    return cleared
+
+
+def _get_field_definition(definition_id: str) -> dict:
+    sb = get_supabase()
+    res = sb.table("species_field_definitions").select("*").eq("id", definition_id).execute()
+    if not res.data:
+        raise SpeciesError("Custom field not found.", 404)
+    return res.data[0]
+
+
+def list_field_definitions(include_retired: bool = False, with_usage: bool = False) -> list:
     sb = get_supabase()
     query = sb.table("species_field_definitions").select("*")
     if not include_retired:
         query = query.eq("is_active", True)
     res = query.order("sort_order").order("label").execute()
-    return [_field_definition_to_dict(r) for r in res.data]
+    definitions = [_field_definition_to_dict(r) for r in res.data]
+
+    if with_usage and definitions:
+        # One scan for all keys — asking per definition would re-read the whole
+        # table once per custom field.
+        counts = _usage_counts({d["field_key"] for d in definitions})
+        for definition in definitions:
+            definition["usage_count"] = counts.get(definition["field_key"], 0)
+    return definitions
+
+
+def _usage_counts(field_keys: set) -> dict:
+    sb = get_supabase()
+    counts = {key: 0 for key in field_keys}
+    offset, page = 0, 1000
+    while True:
+        res = (
+            sb.table("species")
+            .select("custom_fields")
+            .range(offset, offset + page - 1)
+            .execute()
+        )
+        rows = res.data or []
+        for row in rows:
+            values = row.get("custom_fields") or {}
+            for key in field_keys:
+                if key in values and not _is_empty_value(values[key]):
+                    counts[key] += 1
+        if len(rows) < page:
+            return counts
+        offset += page
+
+
+def field_definition_usage(definition_id: str) -> dict:
+    """Which species actually hold a value for this field — what the delete dialog lists."""
+    definition = _get_field_definition(definition_id)
+    holders = _species_holding_field(definition["field_key"])
+    return {
+        "definition": _field_definition_to_dict(definition),
+        "total": len(holders),
+        "species": holders,
+    }
 
 
 def create_field_definition(data: dict, admin_id: str) -> dict:
@@ -556,20 +682,137 @@ def update_field_definition(definition_id: str, data: dict) -> dict:
     return _field_definition_to_dict(res.data[0])
 
 
-def retire_field_definition(definition_id: str) -> None:
+DELETE_MODES = ("retire", "definition_only", "purge")
+
+
+def _log_field_activity(admin_id: str, action: str, description: str, definition_id: str) -> None:
+    from app.services.moderation_service import log_admin_activity
+
+    log_admin_activity(
+        admin_id, action, description,
+        entity_type="SpeciesFieldDefinition", entity_id=definition_id,
+    )
+
+
+def _require_confirm_key(definition: dict, confirm_key: str) -> None:
     """
-    Removes the field from the picker WITHOUT touching values already stored on
-    species. Data an admin captured is never destroyed by a vocabulary change;
-    re-activating the definition brings the existing values back into view.
+    Destructive modes must echo the field key back.
+
+    A DELETE with a mistyped id would otherwise strip a column from every species
+    with no way to undo it; requiring the key makes that impossible to do by
+    accident.
     """
+    if (confirm_key or "").strip() != definition["field_key"]:
+        raise SpeciesError(
+            "Type the field's storage key to confirm deleting saved data.", 400
+        )
+
+
+def delete_field_definition(
+    definition_id: str, mode: str = "retire", confirm_key: str = None, admin_id: str = None
+) -> dict:
+    """
+    Three ways to get rid of a custom field, differing only in what happens to
+    the values already saved on species:
+
+      retire           hide it from the picker, keep every value (reversible)
+      definition_only  drop the definition, keep the values on species
+      purge            drop the definition and strip the value from every species
+
+    `retire` is the default so an unqualified DELETE can never destroy data.
+    """
+    if mode not in DELETE_MODES:
+        raise SpeciesError(
+            f"Unknown delete mode '{mode}'. Expected one of: {', '.join(DELETE_MODES)}.", 400
+        )
     sb = get_supabase()
-    existing = sb.table("species_field_definitions").select("id").eq("id", definition_id).execute()
+    definition = _get_field_definition(definition_id)
+    key = definition["field_key"]
+
+    if mode == "retire":
+        sb.table("species_field_definitions").update({
+            "is_active": False,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }).eq("id", definition_id).execute()
+        if admin_id:
+            _log_field_activity(
+                admin_id, "custom_field_retired",
+                f"Retired custom field '{key}'. Saved values kept.", definition_id,
+            )
+        return {"mode": mode, "field_key": key, "cleared_species": 0, "values_kept": True}
+
+    _require_confirm_key(definition, confirm_key)
+
+    cleared = 0
+    if mode == "purge":
+        holders = _species_holding_field(key)
+        cleared = _strip_field([h["id"] for h in holders], key)
+
+    sb.table("species_field_definitions").delete().eq("id", definition_id).execute()
+
+    if admin_id:
+        detail = (
+            f"and cleared it from {cleared} species"
+            if mode == "purge" else "keeping values already saved on species"
+        )
+        _log_field_activity(
+            admin_id, "custom_field_deleted",
+            f"Deleted custom field '{key}' {detail}.", definition_id,
+        )
+    return {
+        "mode": mode,
+        "field_key": key,
+        "cleared_species": cleared,
+        "values_kept": mode == "definition_only",
+    }
+
+
+def clear_field_values(
+    definition_id: str, species_ids: list, confirm_key: str = None, admin_id: str = None
+) -> dict:
+    """
+    Clears the field on the given species only. The definition itself and every
+    other species are untouched — this is the "delete it just for this species"
+    case, done in bulk.
+    """
+    definition = _get_field_definition(definition_id)
+    _require_confirm_key(definition, confirm_key)
+    if not species_ids:
+        raise SpeciesError("Select at least one species to clear.", 400)
+
+    cleared = _strip_field(species_ids, definition["field_key"])
+    if admin_id:
+        _log_field_activity(
+            admin_id, "custom_field_values_cleared",
+            f"Cleared custom field '{definition['field_key']}' on {cleared} species.",
+            definition_id,
+        )
+    return {
+        "field_key": definition["field_key"],
+        "cleared_species": cleared,
+        "requested_species": len(species_ids),
+    }
+
+
+def clear_species_custom_field(species_id: str, field_key: str) -> dict:
+    """Removes one field from one species, leaving the rest of the record alone."""
+    sb = get_supabase()
+    existing = sb.table("species").select("id, custom_fields").eq("id", species_id).execute()
     if not existing.data:
-        raise SpeciesError("Custom field not found.", 404)
-    sb.table("species_field_definitions").update({
-        "is_active": False,
+        raise SpeciesError("Species not found.", 404)
+
+    current = existing.data[0].get("custom_fields") or {}
+    if field_key not in current:
+        raise SpeciesError("This species has no value for that field.", 404)
+
+    current.pop(field_key)
+    sb.table("species").update({
+        "custom_fields": current,
         "updated_at": datetime.now(timezone.utc).isoformat(),
-    }).eq("id", definition_id).execute()
+    }).eq("id", species_id).execute()
+
+    res = sb.table("species").select(_SELECT).eq("id", species_id).execute()
+    return _to_dict(res.data[0], include_related=True)
 
 
 # ── Species images ─────────────────────────────────────────────────────────────

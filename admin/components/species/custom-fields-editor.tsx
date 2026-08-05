@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Info, Loader2, Plus, X } from "lucide-react";
+import { Info, Loader2, Plus, Settings2, X } from "lucide-react";
 import { toast } from "sonner";
 
 import api, { apiErrorMessage } from "@/lib/api";
@@ -28,6 +28,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ListEditor } from "./list-editor";
+import { ManageFieldsDialog } from "./manage-fields-dialog";
 import type {
   ApiResponse,
   CustomFieldType,
@@ -64,6 +65,7 @@ export function CustomFieldsEditor({
 }) {
   const qc = useQueryClient();
   const [addOpen, setAddOpen] = useState(false);
+  const [manageOpen, setManageOpen] = useState(false);
   const [label, setLabel] = useState("");
   const [fieldKey, setFieldKey] = useState("");
   const [keyEdited, setKeyEdited] = useState(false);
@@ -146,17 +148,32 @@ export function CustomFieldsEditor({
                 field once and it becomes available on <em>every</em> species, so
                 the same information is always recorded the same way.
               </p>
+              <p className="text-muted-foreground mb-2">
+                Leave a field blank on species where it doesn&apos;t apply. Clearing
+                a field here only affects this species — it does not touch other
+                species or delete the field itself.
+              </p>
               <p className="text-muted-foreground">
-                Leave a field blank on species where it doesn&apos;t apply. Removing
-                a field from the list below only clears it on this species — it
-                does not affect other species or delete the field itself.
+                To rename, hide or delete a field for everyone, use{" "}
+                <strong>Manage</strong>. Deleting always asks what should happen to
+                data already saved.
               </p>
             </PopoverContent>
           </Popover>
         </div>
-        <Button type="button" variant="outline" size="sm" onClick={() => setAddOpen(true)}>
-          <Plus size={14} className="mr-1" /> Add field
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setManageOpen(true)}
+          >
+            <Settings2 size={14} className="mr-1" /> Manage
+          </Button>
+          <Button type="button" variant="outline" size="sm" onClick={() => setAddOpen(true)}>
+            <Plus size={14} className="mr-1" /> Add field
+          </Button>
+        </div>
       </div>
 
       {isLoading ? (
@@ -180,6 +197,8 @@ export function CustomFieldsEditor({
           ))}
         </div>
       )}
+
+      <ManageFieldsDialog open={manageOpen} onOpenChange={setManageOpen} />
 
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent className="sm:max-w-md">

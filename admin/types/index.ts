@@ -135,9 +135,34 @@ export interface SpeciesFieldDefinition {
   sort_order?: number;
   is_active?: boolean;
   created_at?: string;
+
+  // Only present when the list is fetched with ?with_usage=true — the manage
+  // screen needs it, the species form doesn't and skips the scan.
+  usage_count?: number;
 }
 
 export type CustomFieldValue = string | number | boolean | string[] | null;
+
+/** A species that holds a value for one custom field. */
+export interface CustomFieldHolder {
+  id: string;
+  common_name: string;
+  scientific_name: string;
+  value: CustomFieldValue;
+}
+
+/** GET /admin/species/field-definitions/<id>/usage — what the delete dialog acts on. */
+export interface FieldDefinitionUsage {
+  definition: SpeciesFieldDefinition;
+  total: number;
+  species: CustomFieldHolder[];
+}
+
+/**
+ * What to do with data already saved when a custom field is deleted.
+ * `retire` keeps the values and is reversible; the other two are not.
+ */
+export type FieldDeleteMode = "retire" | "definition_only" | "purge";
 
 export interface Species {
   id: string;

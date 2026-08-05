@@ -201,6 +201,20 @@ class FieldDefinitionUpdateSchema(ma.Schema):
     is_active = fields.Bool()
 
 
+class FieldValuesClearSchema(ma.Schema):
+    """
+    Clearing a custom field on chosen species. confirm_key echoes the field's
+    storage key so a stray request cannot wipe values.
+    """
+
+    species_ids = fields.List(
+        fields.Str(validate=validate.Length(min=1, max=36)),
+        required=True,
+        validate=validate.Length(min=1),
+    )
+    confirm_key = fields.Str(allow_none=True, validate=validate.Length(max=63))
+
+
 class SuspendUserSchema(ma.Schema):
     suspend = fields.Bool(required=True)
     reason = fields.Str(validate=validate.Length(max=500))

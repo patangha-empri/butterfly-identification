@@ -5,6 +5,7 @@ from app.schemas.admin import (
     SpeciesCreateSchema, SpeciesUpdateSchema,
     DistributionSchema, HostPlantSchema,
     FieldDefinitionCreateSchema, FieldDefinitionUpdateSchema,
+    FieldValuesClearSchema,
     SpeciesImageUpdateSchema,
 )
 from app.services import species_service
@@ -23,6 +24,7 @@ _dist_schema = DistributionSchema()
 _plant_schema = HostPlantSchema()
 _field_def_create_schema = FieldDefinitionCreateSchema()
 _field_def_update_schema = FieldDefinitionUpdateSchema()
+_field_values_clear_schema = FieldValuesClearSchema()
 _image_update_schema = SpeciesImageUpdateSchema()
 
 
@@ -50,7 +52,12 @@ def list_species():
 def list_field_definitions():
     """The admin-defined field vocabulary behind species.custom_fields."""
     include_retired = request.args.get("include_retired") == "true"
-    return success_response(data=species_service.list_field_definitions(include_retired))
+    # Opt-in because it scans every species; the species form doesn't need it,
+    # the manage-fields screen does.
+    with_usage = request.args.get("with_usage") == "true"
+    return success_response(
+        data=species_service.list_field_definitions(include_retired, with_usage)
+    )
 
 
 @admin_species_bp.post("/field-definitions")
@@ -83,16 +90,66 @@ def update_field_definition(definition_id):
     return success_response(data=definition)
 
 
+@admin_species_bp.get("/field-definitions/<definition_id>/usage")
+@admin_required
+def field_definition_usage(definition_id):
+    """
+    Which species hold a value for this field. The delete dialog needs this to
+    say how much data is at stake and to offer a per-species choice.
+    """
+    try:
+        usage = species_service.field_definition_usage(definition_id)
+    except SpeciesError as e:
+        return error_response(e.message, e.status_code)
+    return success_response(data=usage)
+
+
 @admin_species_bp.delete("/field-definitions/<definition_id>")
 @admin_required
-def retire_field_definition(definition_id):
-    """Retires the field from the picker. Values already stored are kept."""
+def delete_field_definition(definition_id):
+    """
+    Removes a custom field. ?mode= decides what happens to saved values:
+    retire (default, keeps everything), definition_only, or purge. The two
+    destructive modes require the field key echoed back as confirm_key.
+    """
+    body = request.get_json(silent=True) or {}
+    mode = request.args.get("mode", "retire")
     try:
-        species_service.retire_field_definition(definition_id)
+        result = species_service.delete_field_definition(
+            definition_id, mode, body.get("confirm_key"), get_jwt_identity()
+        )
+    except SpeciesError as e:
+        return error_response(e.message, e.status_code)
+
+    if result["mode"] == "retire":
+        message = "Custom field retired. Values already saved on species are kept."
+    elif result["mode"] == "definition_only":
+        message = "Custom field deleted. Values already saved on species are kept."
+    else:
+        message = (
+            f"Custom field deleted and cleared from {result['cleared_species']} species."
+        )
+    return success_response(data=result, message=message)
+
+
+@admin_species_bp.delete("/field-definitions/<definition_id>/values")
+@admin_required
+def clear_field_values(definition_id):
+    """Clears the field on chosen species only — the field itself survives."""
+    body = request.get_json(silent=True) or {}
+    errors = _field_values_clear_schema.validate(body)
+    if errors:
+        return error_response("Validation failed.", 422, errors=errors)
+    data = _field_values_clear_schema.load(body)
+    try:
+        result = species_service.clear_field_values(
+            definition_id, data["species_ids"], data.get("confirm_key"), get_jwt_identity()
+        )
     except SpeciesError as e:
         return error_response(e.message, e.status_code)
     return success_response(
-        message="Custom field retired. Values already saved on species are kept."
+        data=result,
+        message=f"Cleared on {result['cleared_species']} species. The field itself is unchanged.",
     )
 
 
@@ -164,6 +221,20 @@ def activate_species(species_id):
     return success_response(
         data=species, message="Species reactivated. It is visible in the mobile app again."
     )
+
+
+@admin_species_bp.delete("/<species_id>/custom-fields/<field_key>")
+@admin_required
+def clear_species_custom_field(species_id, field_key):
+    """
+    Clears one custom field on one species. The field stays available and every
+    other species keeps its value — the narrowest of the delete options.
+    """
+    try:
+        species = species_service.clear_species_custom_field(species_id, field_key)
+    except SpeciesError as e:
+        return error_response(e.message, e.status_code)
+    return success_response(data=species, message="Field cleared on this species.")
 
 
 # ── Images ─────────────────────────────────────────────────────────────────────
