@@ -35,7 +35,14 @@ def _now() -> str:
 
 
 def _match_to_dict(m: dict) -> dict:
-    from app.services.species_service import _to_dict as species_to_dict
+    # Identification results are read by the app, so the species payload goes
+    # through the same public filter as /species — otherwise admin-only custom
+    # fields would leak through the match instead.
+    from app.services.species_service import (
+        _to_dict as species_to_dict,
+        _public_view,
+        public_field_keys,
+    )
     species = m.get("species")
     if isinstance(species, list):
         species = species[0] if species else None
@@ -46,7 +53,10 @@ def _match_to_dict(m: dict) -> dict:
         "matched_common_name": m.get("matched_common_name"),
         "matched_scientific_name": m.get("matched_scientific_name"),
         "species_id": m.get("species_id"),
-        "species": species_to_dict(species, include_related=True) if species else None,
+        "species": (
+            _public_view(species_to_dict(species, include_related=True), public_field_keys())
+            if species else None
+        ),
         "is_accepted": m.get("is_accepted"),
     }
 

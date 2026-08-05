@@ -71,6 +71,7 @@ export function CustomFieldsEditor({
   const [keyEdited, setKeyEdited] = useState(false);
   const [fieldType, setFieldType] = useState<CustomFieldType>("text");
   const [helpText, setHelpText] = useState("");
+  const [isPublic, setIsPublic] = useState(false);
 
   const { data: definitions = [], isLoading } = useQuery({
     queryKey: ["species-field-definitions"],
@@ -102,6 +103,7 @@ export function CustomFieldsEditor({
           field_key: fieldKey.trim(),
           label: label.trim(),
           field_type: fieldType,
+          is_public: isPublic,
           ...(helpText.trim() && { help_text: helpText.trim() }),
         }
       );
@@ -116,6 +118,7 @@ export function CustomFieldsEditor({
       setKeyEdited(false);
       setFieldType("text");
       setHelpText("");
+      setIsPublic(false);
     },
     onError: (err) => toast.error(apiErrorMessage(err)),
   });
@@ -277,6 +280,17 @@ export function CustomFieldsEditor({
                 onChange={(e) => setHelpText(e.target.value)}
               />
             </div>
+
+            <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border p-2.5">
+              <Switch checked={isPublic} onCheckedChange={setIsPublic} className="mt-0.5" />
+              <span className="space-y-0.5">
+                <span className="block text-xs font-medium">Show in the app</span>
+                <span className="block text-[11px] leading-relaxed text-muted-foreground">
+                  Off by default. Turn it on only for information you want app
+                  users to read — internal notes should stay off.
+                </span>
+              </span>
+            </label>
           </div>
 
           <DialogFooter>

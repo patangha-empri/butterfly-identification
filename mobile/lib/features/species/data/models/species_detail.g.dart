@@ -61,6 +61,8 @@ _$SpeciesDetailImpl _$$SpeciesDetailImplFromJson(Map<String, dynamic> json) =>
               'observation_count', (v) => (v as num?)?.toInt() ?? 0),
           isBookmarked:
               $checkedConvert('is_bookmarked', (v) => v as bool? ?? false),
+          customFields: $checkedConvert('custom_fields',
+              (v) => v as Map<String, dynamic>? ?? const <String, dynamic>{}),
         );
         return val;
       },
@@ -74,7 +76,8 @@ _$SpeciesDetailImpl _$$SpeciesDetailImplFromJson(Map<String, dynamic> json) =>
         'hostPlants': 'host_plants',
         'primaryImageUrl': 'primary_image_url',
         'observationCount': 'observation_count',
-        'isBookmarked': 'is_bookmarked'
+        'isBookmarked': 'is_bookmarked',
+        'customFields': 'custom_fields'
       },
     );
 
@@ -102,6 +105,7 @@ Map<String, dynamic> _$$SpeciesDetailImplToJson(_$SpeciesDetailImpl instance) =>
         'primary_image_url': value,
       'observation_count': instance.observationCount,
       'is_bookmarked': instance.isBookmarked,
+      'custom_fields': instance.customFields,
     };
 
 _$SpeciesImageImpl _$$SpeciesImageImplFromJson(Map<String, dynamic> json) =>
@@ -147,4 +151,43 @@ Map<String, dynamic> _$$HostPlantImplToJson(_$HostPlantImpl instance) =>
     <String, dynamic>{
       'name': instance.name,
       if (instance.scientificName case final value?) 'scientific_name': value,
+    };
+
+_$SpeciesFieldDefinitionImpl _$$SpeciesFieldDefinitionImplFromJson(
+        Map<String, dynamic> json) =>
+    $checkedCreate(
+      r'_$SpeciesFieldDefinitionImpl',
+      json,
+      ($checkedConvert) {
+        final val = _$SpeciesFieldDefinitionImpl(
+          fieldKey: $checkedConvert('field_key', (v) => v as String),
+          label: $checkedConvert('label', (v) => v as String),
+          fieldType:
+              $checkedConvert('field_type', (v) => v as String? ?? 'text'),
+          helpText: $checkedConvert('help_text', (v) => v as String?),
+          groupName: $checkedConvert(
+              'group_name', (v) => v as String? ?? 'Custom fields'),
+          sortOrder:
+              $checkedConvert('sort_order', (v) => (v as num?)?.toInt() ?? 0),
+        );
+        return val;
+      },
+      fieldKeyMap: const {
+        'fieldKey': 'field_key',
+        'fieldType': 'field_type',
+        'helpText': 'help_text',
+        'groupName': 'group_name',
+        'sortOrder': 'sort_order'
+      },
+    );
+
+Map<String, dynamic> _$$SpeciesFieldDefinitionImplToJson(
+        _$SpeciesFieldDefinitionImpl instance) =>
+    <String, dynamic>{
+      'field_key': instance.fieldKey,
+      'label': instance.label,
+      'field_type': instance.fieldType,
+      if (instance.helpText case final value?) 'help_text': value,
+      'group_name': instance.groupName,
+      'sort_order': instance.sortOrder,
     };

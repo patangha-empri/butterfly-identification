@@ -66,6 +66,9 @@ abstract class ApiEndpoints {
   // Trailing slash on the list route avoids a 308 redirect (backend route is
   // `@species_bp.get("/")`). Detail/sub-routes use no trailing slash.
   static const String species = '$_v1/species/';
+  // Static route — must be declared as its own constant rather than built via
+  // speciesDetail(), which would send it down the `/<slug_or_id>` handler.
+  static const String speciesFieldDefinitions = '$_v1/species/field-definitions';
   static String speciesDetail(String id) => '$_v1/species/$id';
   static String speciesImages(String id) => '$_v1/species/$id/images';
   static String speciesSimilar(String id) => '$_v1/species/$id/similar';

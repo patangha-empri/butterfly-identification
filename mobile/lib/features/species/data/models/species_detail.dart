@@ -31,6 +31,13 @@ class SpeciesDetail with _$SpeciesDetail {
     @JsonKey(name: 'primary_image_url') String? primaryImageUrl,
     @JsonKey(name: 'observation_count') @Default(0) int observationCount,
     @JsonKey(name: 'is_bookmarked') @Default(false) bool isBookmarked,
+
+    /// Admin-defined fields, keyed by the definition's `field_key`. The backend
+    /// only sends the ones marked visible in the app; titles and types come
+    /// from [SpeciesFieldDefinition], not from here.
+    @JsonKey(name: 'custom_fields')
+    @Default(<String, dynamic>{})
+    Map<String, dynamic> customFields,
   }) = _SpeciesDetail;
 
   const SpeciesDetail._();
@@ -74,4 +81,45 @@ class HostPlant with _$HostPlant {
 
   factory HostPlant.fromJson(Map<String, dynamic> json) =>
       _$HostPlantFromJson(json);
+}
+
+/// ─────────────────────────────────────────────────────────────────────────────
+/// SPECIES FIELD DEFINITION
+/// Describes one admin-defined field: how to title, order and format the raw
+/// value found in [SpeciesDetail.customFields]. Fetched once from
+/// `/species/field-definitions`, which only lists fields marked visible in the
+/// app — the rest never leave the admin panel.
+/// ─────────────────────────────────────────────────────────────────────────────
+
+@freezed
+class SpeciesFieldDefinition with _$SpeciesFieldDefinition {
+  const factory SpeciesFieldDefinition({
+    @JsonKey(name: 'field_key') required String fieldKey,
+    required String label,
+    @JsonKey(name: 'field_type') @Default('text') String fieldType,
+    @JsonKey(name: 'help_text') String? helpText,
+    @JsonKey(name: 'group_name') @Default('Custom fields') String groupName,
+    @JsonKey(name: 'sort_order') @Default(0) int sortOrder,
+  }) = _SpeciesFieldDefinition;
+
+  const SpeciesFieldDefinition._();
+
+  factory SpeciesFieldDefinition.fromJson(Map<String, dynamic> json) =>
+      _$SpeciesFieldDefinitionFromJson(json);
+
+  /// The value rendered as text, or null when this species has nothing to show.
+  ///
+  /// Values are untyped on the wire: the column is JSONB and the type lives in
+  /// the definition, so a "number" field can still arrive as a string from an
+  /// older record. Formatting off the runtime type keeps that harmless.
+  String? display(Object? value) {
+    if (value == null) return null;
+    if (value is bool) return value ? 'Yes' : 'No';
+    if (value is List) {
+      final parts = value.map((e) => '$e'.trim()).where((e) => e.isNotEmpty);
+      return parts.isEmpty ? null : parts.join(', ');
+    }
+    final text = '$value'.trim();
+    return text.isEmpty ? null : text;
+  }
 }

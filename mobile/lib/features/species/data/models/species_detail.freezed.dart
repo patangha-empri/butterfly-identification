@@ -49,6 +49,12 @@ mixin _$SpeciesDetail {
   int get observationCount => throw _privateConstructorUsedError;
   @JsonKey(name: 'is_bookmarked')
   bool get isBookmarked => throw _privateConstructorUsedError;
+
+  /// Admin-defined fields, keyed by the definition's `field_key`. The backend
+  /// only sends the ones marked visible in the app; titles and types come
+  /// from [SpeciesFieldDefinition], not from here.
+  @JsonKey(name: 'custom_fields')
+  Map<String, dynamic> get customFields => throw _privateConstructorUsedError;
   @optionalTypeArgs
   TResult when<TResult extends Object?>(
     TResult Function(
@@ -70,7 +76,8 @@ mixin _$SpeciesDetail {
             List<SpeciesImage> images,
             @JsonKey(name: 'primary_image_url') String? primaryImageUrl,
             @JsonKey(name: 'observation_count') int observationCount,
-            @JsonKey(name: 'is_bookmarked') bool isBookmarked)
+            @JsonKey(name: 'is_bookmarked') bool isBookmarked,
+            @JsonKey(name: 'custom_fields') Map<String, dynamic> customFields)
         $default,
   ) =>
       throw _privateConstructorUsedError;
@@ -95,7 +102,8 @@ mixin _$SpeciesDetail {
             List<SpeciesImage> images,
             @JsonKey(name: 'primary_image_url') String? primaryImageUrl,
             @JsonKey(name: 'observation_count') int observationCount,
-            @JsonKey(name: 'is_bookmarked') bool isBookmarked)?
+            @JsonKey(name: 'is_bookmarked') bool isBookmarked,
+            @JsonKey(name: 'custom_fields') Map<String, dynamic> customFields)?
         $default,
   ) =>
       throw _privateConstructorUsedError;
@@ -120,7 +128,8 @@ mixin _$SpeciesDetail {
             List<SpeciesImage> images,
             @JsonKey(name: 'primary_image_url') String? primaryImageUrl,
             @JsonKey(name: 'observation_count') int observationCount,
-            @JsonKey(name: 'is_bookmarked') bool isBookmarked)?
+            @JsonKey(name: 'is_bookmarked') bool isBookmarked,
+            @JsonKey(name: 'custom_fields') Map<String, dynamic> customFields)?
         $default, {
     required TResult orElse(),
   }) =>
@@ -177,7 +186,8 @@ abstract class $SpeciesDetailCopyWith<$Res> {
       List<SpeciesImage> images,
       @JsonKey(name: 'primary_image_url') String? primaryImageUrl,
       @JsonKey(name: 'observation_count') int observationCount,
-      @JsonKey(name: 'is_bookmarked') bool isBookmarked});
+      @JsonKey(name: 'is_bookmarked') bool isBookmarked,
+      @JsonKey(name: 'custom_fields') Map<String, dynamic> customFields});
 }
 
 /// @nodoc
@@ -214,6 +224,7 @@ class _$SpeciesDetailCopyWithImpl<$Res, $Val extends SpeciesDetail>
     Object? primaryImageUrl = freezed,
     Object? observationCount = null,
     Object? isBookmarked = null,
+    Object? customFields = null,
   }) {
     return _then(_value.copyWith(
       id: null == id
@@ -292,6 +303,10 @@ class _$SpeciesDetailCopyWithImpl<$Res, $Val extends SpeciesDetail>
           ? _value.isBookmarked
           : isBookmarked // ignore: cast_nullable_to_non_nullable
               as bool,
+      customFields: null == customFields
+          ? _value.customFields
+          : customFields // ignore: cast_nullable_to_non_nullable
+              as Map<String, dynamic>,
     ) as $Val);
   }
 }
@@ -323,7 +338,8 @@ abstract class _$$SpeciesDetailImplCopyWith<$Res>
       List<SpeciesImage> images,
       @JsonKey(name: 'primary_image_url') String? primaryImageUrl,
       @JsonKey(name: 'observation_count') int observationCount,
-      @JsonKey(name: 'is_bookmarked') bool isBookmarked});
+      @JsonKey(name: 'is_bookmarked') bool isBookmarked,
+      @JsonKey(name: 'custom_fields') Map<String, dynamic> customFields});
 }
 
 /// @nodoc
@@ -358,6 +374,7 @@ class __$$SpeciesDetailImplCopyWithImpl<$Res>
     Object? primaryImageUrl = freezed,
     Object? observationCount = null,
     Object? isBookmarked = null,
+    Object? customFields = null,
   }) {
     return _then(_$SpeciesDetailImpl(
       id: null == id
@@ -436,6 +453,10 @@ class __$$SpeciesDetailImplCopyWithImpl<$Res>
           ? _value.isBookmarked
           : isBookmarked // ignore: cast_nullable_to_non_nullable
               as bool,
+      customFields: null == customFields
+          ? _value._customFields
+          : customFields // ignore: cast_nullable_to_non_nullable
+              as Map<String, dynamic>,
     ));
   }
 }
@@ -462,11 +483,14 @@ class _$SpeciesDetailImpl extends _SpeciesDetail {
       final List<SpeciesImage> images = const [],
       @JsonKey(name: 'primary_image_url') this.primaryImageUrl,
       @JsonKey(name: 'observation_count') this.observationCount = 0,
-      @JsonKey(name: 'is_bookmarked') this.isBookmarked = false})
+      @JsonKey(name: 'is_bookmarked') this.isBookmarked = false,
+      @JsonKey(name: 'custom_fields')
+      final Map<String, dynamic> customFields = const <String, dynamic>{}})
       : _flightMonths = flightMonths,
         _hostPlants = hostPlants,
         _states = states,
         _images = images,
+        _customFields = customFields,
         super._();
 
   factory _$SpeciesDetailImpl.fromJson(Map<String, dynamic> json) =>
@@ -547,9 +571,25 @@ class _$SpeciesDetailImpl extends _SpeciesDetail {
   @JsonKey(name: 'is_bookmarked')
   final bool isBookmarked;
 
+  /// Admin-defined fields, keyed by the definition's `field_key`. The backend
+  /// only sends the ones marked visible in the app; titles and types come
+  /// from [SpeciesFieldDefinition], not from here.
+  final Map<String, dynamic> _customFields;
+
+  /// Admin-defined fields, keyed by the definition's `field_key`. The backend
+  /// only sends the ones marked visible in the app; titles and types come
+  /// from [SpeciesFieldDefinition], not from here.
+  @override
+  @JsonKey(name: 'custom_fields')
+  Map<String, dynamic> get customFields {
+    if (_customFields is EqualUnmodifiableMapView) return _customFields;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableMapView(_customFields);
+  }
+
   @override
   String toString() {
-    return 'SpeciesDetail(id: $id, commonName: $commonName, scientificName: $scientificName, family: $family, subfamily: $subfamily, genus: $genus, description: $description, habitat: $habitat, descriptionShort: $descriptionShort, rarity: $rarity, conservationStatus: $conservationStatus, wingspanMm: $wingspanMm, flightMonths: $flightMonths, hostPlants: $hostPlants, states: $states, images: $images, primaryImageUrl: $primaryImageUrl, observationCount: $observationCount, isBookmarked: $isBookmarked)';
+    return 'SpeciesDetail(id: $id, commonName: $commonName, scientificName: $scientificName, family: $family, subfamily: $subfamily, genus: $genus, description: $description, habitat: $habitat, descriptionShort: $descriptionShort, rarity: $rarity, conservationStatus: $conservationStatus, wingspanMm: $wingspanMm, flightMonths: $flightMonths, hostPlants: $hostPlants, states: $states, images: $images, primaryImageUrl: $primaryImageUrl, observationCount: $observationCount, isBookmarked: $isBookmarked, customFields: $customFields)';
   }
 
   @override
@@ -587,7 +627,9 @@ class _$SpeciesDetailImpl extends _SpeciesDetail {
             (identical(other.observationCount, observationCount) ||
                 other.observationCount == observationCount) &&
             (identical(other.isBookmarked, isBookmarked) ||
-                other.isBookmarked == isBookmarked));
+                other.isBookmarked == isBookmarked) &&
+            const DeepCollectionEquality()
+                .equals(other._customFields, _customFields));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -612,7 +654,8 @@ class _$SpeciesDetailImpl extends _SpeciesDetail {
         const DeepCollectionEquality().hash(_images),
         primaryImageUrl,
         observationCount,
-        isBookmarked
+        isBookmarked,
+        const DeepCollectionEquality().hash(_customFields)
       ]);
 
   /// Create a copy of SpeciesDetail
@@ -645,7 +688,8 @@ class _$SpeciesDetailImpl extends _SpeciesDetail {
             List<SpeciesImage> images,
             @JsonKey(name: 'primary_image_url') String? primaryImageUrl,
             @JsonKey(name: 'observation_count') int observationCount,
-            @JsonKey(name: 'is_bookmarked') bool isBookmarked)
+            @JsonKey(name: 'is_bookmarked') bool isBookmarked,
+            @JsonKey(name: 'custom_fields') Map<String, dynamic> customFields)
         $default,
   ) {
     return $default(
@@ -667,7 +711,8 @@ class _$SpeciesDetailImpl extends _SpeciesDetail {
         images,
         primaryImageUrl,
         observationCount,
-        isBookmarked);
+        isBookmarked,
+        customFields);
   }
 
   @override
@@ -692,7 +737,8 @@ class _$SpeciesDetailImpl extends _SpeciesDetail {
             List<SpeciesImage> images,
             @JsonKey(name: 'primary_image_url') String? primaryImageUrl,
             @JsonKey(name: 'observation_count') int observationCount,
-            @JsonKey(name: 'is_bookmarked') bool isBookmarked)?
+            @JsonKey(name: 'is_bookmarked') bool isBookmarked,
+            @JsonKey(name: 'custom_fields') Map<String, dynamic> customFields)?
         $default,
   ) {
     return $default?.call(
@@ -714,7 +760,8 @@ class _$SpeciesDetailImpl extends _SpeciesDetail {
         images,
         primaryImageUrl,
         observationCount,
-        isBookmarked);
+        isBookmarked,
+        customFields);
   }
 
   @override
@@ -739,7 +786,8 @@ class _$SpeciesDetailImpl extends _SpeciesDetail {
             List<SpeciesImage> images,
             @JsonKey(name: 'primary_image_url') String? primaryImageUrl,
             @JsonKey(name: 'observation_count') int observationCount,
-            @JsonKey(name: 'is_bookmarked') bool isBookmarked)?
+            @JsonKey(name: 'is_bookmarked') bool isBookmarked,
+            @JsonKey(name: 'custom_fields') Map<String, dynamic> customFields)?
         $default, {
     required TResult orElse(),
   }) {
@@ -763,7 +811,8 @@ class _$SpeciesDetailImpl extends _SpeciesDetail {
           images,
           primaryImageUrl,
           observationCount,
-          isBookmarked);
+          isBookmarked,
+          customFields);
     }
     return orElse();
   }
@@ -824,8 +873,9 @@ abstract class _SpeciesDetail extends SpeciesDetail {
       final List<SpeciesImage> images,
       @JsonKey(name: 'primary_image_url') final String? primaryImageUrl,
       @JsonKey(name: 'observation_count') final int observationCount,
-      @JsonKey(name: 'is_bookmarked')
-      final bool isBookmarked}) = _$SpeciesDetailImpl;
+      @JsonKey(name: 'is_bookmarked') final bool isBookmarked,
+      @JsonKey(name: 'custom_fields')
+      final Map<String, dynamic> customFields}) = _$SpeciesDetailImpl;
   const _SpeciesDetail._() : super._();
 
   factory _SpeciesDetail.fromJson(Map<String, dynamic> json) =
@@ -879,6 +929,13 @@ abstract class _SpeciesDetail extends SpeciesDetail {
   @override
   @JsonKey(name: 'is_bookmarked')
   bool get isBookmarked;
+
+  /// Admin-defined fields, keyed by the definition's `field_key`. The backend
+  /// only sends the ones marked visible in the app; titles and types come
+  /// from [SpeciesFieldDefinition], not from here.
+  @override
+  @JsonKey(name: 'custom_fields')
+  Map<String, dynamic> get customFields;
 
   /// Create a copy of SpeciesDetail
   /// with the given fields replaced by the non-null parameter values.
@@ -1481,4 +1538,419 @@ abstract class _HostPlant implements HostPlant {
   @JsonKey(includeFromJson: false, includeToJson: false)
   _$$HostPlantImplCopyWith<_$HostPlantImpl> get copyWith =>
       throw _privateConstructorUsedError;
+}
+
+SpeciesFieldDefinition _$SpeciesFieldDefinitionFromJson(
+    Map<String, dynamic> json) {
+  return _SpeciesFieldDefinition.fromJson(json);
+}
+
+/// @nodoc
+mixin _$SpeciesFieldDefinition {
+  @JsonKey(name: 'field_key')
+  String get fieldKey => throw _privateConstructorUsedError;
+  String get label => throw _privateConstructorUsedError;
+  @JsonKey(name: 'field_type')
+  String get fieldType => throw _privateConstructorUsedError;
+  @JsonKey(name: 'help_text')
+  String? get helpText => throw _privateConstructorUsedError;
+  @JsonKey(name: 'group_name')
+  String get groupName => throw _privateConstructorUsedError;
+  @JsonKey(name: 'sort_order')
+  int get sortOrder => throw _privateConstructorUsedError;
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>(
+    TResult Function(
+            @JsonKey(name: 'field_key') String fieldKey,
+            String label,
+            @JsonKey(name: 'field_type') String fieldType,
+            @JsonKey(name: 'help_text') String? helpText,
+            @JsonKey(name: 'group_name') String groupName,
+            @JsonKey(name: 'sort_order') int sortOrder)
+        $default,
+  ) =>
+      throw _privateConstructorUsedError;
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>(
+    TResult? Function(
+            @JsonKey(name: 'field_key') String fieldKey,
+            String label,
+            @JsonKey(name: 'field_type') String fieldType,
+            @JsonKey(name: 'help_text') String? helpText,
+            @JsonKey(name: 'group_name') String groupName,
+            @JsonKey(name: 'sort_order') int sortOrder)?
+        $default,
+  ) =>
+      throw _privateConstructorUsedError;
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>(
+    TResult Function(
+            @JsonKey(name: 'field_key') String fieldKey,
+            String label,
+            @JsonKey(name: 'field_type') String fieldType,
+            @JsonKey(name: 'help_text') String? helpText,
+            @JsonKey(name: 'group_name') String groupName,
+            @JsonKey(name: 'sort_order') int sortOrder)?
+        $default, {
+    required TResult orElse(),
+  }) =>
+      throw _privateConstructorUsedError;
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>(
+    TResult Function(_SpeciesFieldDefinition value) $default,
+  ) =>
+      throw _privateConstructorUsedError;
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>(
+    TResult? Function(_SpeciesFieldDefinition value)? $default,
+  ) =>
+      throw _privateConstructorUsedError;
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>(
+    TResult Function(_SpeciesFieldDefinition value)? $default, {
+    required TResult orElse(),
+  }) =>
+      throw _privateConstructorUsedError;
+
+  /// Serializes this SpeciesFieldDefinition to a JSON map.
+  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
+
+  /// Create a copy of SpeciesFieldDefinition
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  $SpeciesFieldDefinitionCopyWith<SpeciesFieldDefinition> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+
+/// @nodoc
+abstract class $SpeciesFieldDefinitionCopyWith<$Res> {
+  factory $SpeciesFieldDefinitionCopyWith(SpeciesFieldDefinition value,
+          $Res Function(SpeciesFieldDefinition) then) =
+      _$SpeciesFieldDefinitionCopyWithImpl<$Res, SpeciesFieldDefinition>;
+  @useResult
+  $Res call(
+      {@JsonKey(name: 'field_key') String fieldKey,
+      String label,
+      @JsonKey(name: 'field_type') String fieldType,
+      @JsonKey(name: 'help_text') String? helpText,
+      @JsonKey(name: 'group_name') String groupName,
+      @JsonKey(name: 'sort_order') int sortOrder});
+}
+
+/// @nodoc
+class _$SpeciesFieldDefinitionCopyWithImpl<$Res,
+        $Val extends SpeciesFieldDefinition>
+    implements $SpeciesFieldDefinitionCopyWith<$Res> {
+  _$SpeciesFieldDefinitionCopyWithImpl(this._value, this._then);
+
+  // ignore: unused_field
+  final $Val _value;
+  // ignore: unused_field
+  final $Res Function($Val) _then;
+
+  /// Create a copy of SpeciesFieldDefinition
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? fieldKey = null,
+    Object? label = null,
+    Object? fieldType = null,
+    Object? helpText = freezed,
+    Object? groupName = null,
+    Object? sortOrder = null,
+  }) {
+    return _then(_value.copyWith(
+      fieldKey: null == fieldKey
+          ? _value.fieldKey
+          : fieldKey // ignore: cast_nullable_to_non_nullable
+              as String,
+      label: null == label
+          ? _value.label
+          : label // ignore: cast_nullable_to_non_nullable
+              as String,
+      fieldType: null == fieldType
+          ? _value.fieldType
+          : fieldType // ignore: cast_nullable_to_non_nullable
+              as String,
+      helpText: freezed == helpText
+          ? _value.helpText
+          : helpText // ignore: cast_nullable_to_non_nullable
+              as String?,
+      groupName: null == groupName
+          ? _value.groupName
+          : groupName // ignore: cast_nullable_to_non_nullable
+              as String,
+      sortOrder: null == sortOrder
+          ? _value.sortOrder
+          : sortOrder // ignore: cast_nullable_to_non_nullable
+              as int,
+    ) as $Val);
+  }
+}
+
+/// @nodoc
+abstract class _$$SpeciesFieldDefinitionImplCopyWith<$Res>
+    implements $SpeciesFieldDefinitionCopyWith<$Res> {
+  factory _$$SpeciesFieldDefinitionImplCopyWith(
+          _$SpeciesFieldDefinitionImpl value,
+          $Res Function(_$SpeciesFieldDefinitionImpl) then) =
+      __$$SpeciesFieldDefinitionImplCopyWithImpl<$Res>;
+  @override
+  @useResult
+  $Res call(
+      {@JsonKey(name: 'field_key') String fieldKey,
+      String label,
+      @JsonKey(name: 'field_type') String fieldType,
+      @JsonKey(name: 'help_text') String? helpText,
+      @JsonKey(name: 'group_name') String groupName,
+      @JsonKey(name: 'sort_order') int sortOrder});
+}
+
+/// @nodoc
+class __$$SpeciesFieldDefinitionImplCopyWithImpl<$Res>
+    extends _$SpeciesFieldDefinitionCopyWithImpl<$Res,
+        _$SpeciesFieldDefinitionImpl>
+    implements _$$SpeciesFieldDefinitionImplCopyWith<$Res> {
+  __$$SpeciesFieldDefinitionImplCopyWithImpl(
+      _$SpeciesFieldDefinitionImpl _value,
+      $Res Function(_$SpeciesFieldDefinitionImpl) _then)
+      : super(_value, _then);
+
+  /// Create a copy of SpeciesFieldDefinition
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? fieldKey = null,
+    Object? label = null,
+    Object? fieldType = null,
+    Object? helpText = freezed,
+    Object? groupName = null,
+    Object? sortOrder = null,
+  }) {
+    return _then(_$SpeciesFieldDefinitionImpl(
+      fieldKey: null == fieldKey
+          ? _value.fieldKey
+          : fieldKey // ignore: cast_nullable_to_non_nullable
+              as String,
+      label: null == label
+          ? _value.label
+          : label // ignore: cast_nullable_to_non_nullable
+              as String,
+      fieldType: null == fieldType
+          ? _value.fieldType
+          : fieldType // ignore: cast_nullable_to_non_nullable
+              as String,
+      helpText: freezed == helpText
+          ? _value.helpText
+          : helpText // ignore: cast_nullable_to_non_nullable
+              as String?,
+      groupName: null == groupName
+          ? _value.groupName
+          : groupName // ignore: cast_nullable_to_non_nullable
+              as String,
+      sortOrder: null == sortOrder
+          ? _value.sortOrder
+          : sortOrder // ignore: cast_nullable_to_non_nullable
+              as int,
+    ));
+  }
+}
+
+/// @nodoc
+@JsonSerializable()
+class _$SpeciesFieldDefinitionImpl extends _SpeciesFieldDefinition {
+  const _$SpeciesFieldDefinitionImpl(
+      {@JsonKey(name: 'field_key') required this.fieldKey,
+      required this.label,
+      @JsonKey(name: 'field_type') this.fieldType = 'text',
+      @JsonKey(name: 'help_text') this.helpText,
+      @JsonKey(name: 'group_name') this.groupName = 'Custom fields',
+      @JsonKey(name: 'sort_order') this.sortOrder = 0})
+      : super._();
+
+  factory _$SpeciesFieldDefinitionImpl.fromJson(Map<String, dynamic> json) =>
+      _$$SpeciesFieldDefinitionImplFromJson(json);
+
+  @override
+  @JsonKey(name: 'field_key')
+  final String fieldKey;
+  @override
+  final String label;
+  @override
+  @JsonKey(name: 'field_type')
+  final String fieldType;
+  @override
+  @JsonKey(name: 'help_text')
+  final String? helpText;
+  @override
+  @JsonKey(name: 'group_name')
+  final String groupName;
+  @override
+  @JsonKey(name: 'sort_order')
+  final int sortOrder;
+
+  @override
+  String toString() {
+    return 'SpeciesFieldDefinition(fieldKey: $fieldKey, label: $label, fieldType: $fieldType, helpText: $helpText, groupName: $groupName, sortOrder: $sortOrder)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$SpeciesFieldDefinitionImpl &&
+            (identical(other.fieldKey, fieldKey) ||
+                other.fieldKey == fieldKey) &&
+            (identical(other.label, label) || other.label == label) &&
+            (identical(other.fieldType, fieldType) ||
+                other.fieldType == fieldType) &&
+            (identical(other.helpText, helpText) ||
+                other.helpText == helpText) &&
+            (identical(other.groupName, groupName) ||
+                other.groupName == groupName) &&
+            (identical(other.sortOrder, sortOrder) ||
+                other.sortOrder == sortOrder));
+  }
+
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  int get hashCode => Object.hash(
+      runtimeType, fieldKey, label, fieldType, helpText, groupName, sortOrder);
+
+  /// Create a copy of SpeciesFieldDefinition
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$SpeciesFieldDefinitionImplCopyWith<_$SpeciesFieldDefinitionImpl>
+      get copyWith => __$$SpeciesFieldDefinitionImplCopyWithImpl<
+          _$SpeciesFieldDefinitionImpl>(this, _$identity);
+
+  @override
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>(
+    TResult Function(
+            @JsonKey(name: 'field_key') String fieldKey,
+            String label,
+            @JsonKey(name: 'field_type') String fieldType,
+            @JsonKey(name: 'help_text') String? helpText,
+            @JsonKey(name: 'group_name') String groupName,
+            @JsonKey(name: 'sort_order') int sortOrder)
+        $default,
+  ) {
+    return $default(fieldKey, label, fieldType, helpText, groupName, sortOrder);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>(
+    TResult? Function(
+            @JsonKey(name: 'field_key') String fieldKey,
+            String label,
+            @JsonKey(name: 'field_type') String fieldType,
+            @JsonKey(name: 'help_text') String? helpText,
+            @JsonKey(name: 'group_name') String groupName,
+            @JsonKey(name: 'sort_order') int sortOrder)?
+        $default,
+  ) {
+    return $default?.call(
+        fieldKey, label, fieldType, helpText, groupName, sortOrder);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>(
+    TResult Function(
+            @JsonKey(name: 'field_key') String fieldKey,
+            String label,
+            @JsonKey(name: 'field_type') String fieldType,
+            @JsonKey(name: 'help_text') String? helpText,
+            @JsonKey(name: 'group_name') String groupName,
+            @JsonKey(name: 'sort_order') int sortOrder)?
+        $default, {
+    required TResult orElse(),
+  }) {
+    if ($default != null) {
+      return $default(
+          fieldKey, label, fieldType, helpText, groupName, sortOrder);
+    }
+    return orElse();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>(
+    TResult Function(_SpeciesFieldDefinition value) $default,
+  ) {
+    return $default(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>(
+    TResult? Function(_SpeciesFieldDefinition value)? $default,
+  ) {
+    return $default?.call(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>(
+    TResult Function(_SpeciesFieldDefinition value)? $default, {
+    required TResult orElse(),
+  }) {
+    if ($default != null) {
+      return $default(this);
+    }
+    return orElse();
+  }
+
+  @override
+  Map<String, dynamic> toJson() {
+    return _$$SpeciesFieldDefinitionImplToJson(
+      this,
+    );
+  }
+}
+
+abstract class _SpeciesFieldDefinition extends SpeciesFieldDefinition {
+  const factory _SpeciesFieldDefinition(
+          {@JsonKey(name: 'field_key') required final String fieldKey,
+          required final String label,
+          @JsonKey(name: 'field_type') final String fieldType,
+          @JsonKey(name: 'help_text') final String? helpText,
+          @JsonKey(name: 'group_name') final String groupName,
+          @JsonKey(name: 'sort_order') final int sortOrder}) =
+      _$SpeciesFieldDefinitionImpl;
+  const _SpeciesFieldDefinition._() : super._();
+
+  factory _SpeciesFieldDefinition.fromJson(Map<String, dynamic> json) =
+      _$SpeciesFieldDefinitionImpl.fromJson;
+
+  @override
+  @JsonKey(name: 'field_key')
+  String get fieldKey;
+  @override
+  String get label;
+  @override
+  @JsonKey(name: 'field_type')
+  String get fieldType;
+  @override
+  @JsonKey(name: 'help_text')
+  String? get helpText;
+  @override
+  @JsonKey(name: 'group_name')
+  String get groupName;
+  @override
+  @JsonKey(name: 'sort_order')
+  int get sortOrder;
+
+  /// Create a copy of SpeciesFieldDefinition
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$SpeciesFieldDefinitionImplCopyWith<_$SpeciesFieldDefinitionImpl>
+      get copyWith => throw _privateConstructorUsedError;
 }

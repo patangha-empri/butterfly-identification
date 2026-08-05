@@ -134,6 +134,10 @@ export interface SpeciesFieldDefinition {
   group_name?: string;
   sort_order?: number;
   is_active?: boolean;
+
+  // Whether app users see the field. False by default — a field is admin-only
+  // until someone opts it in (migration 005).
+  is_public?: boolean;
   created_at?: string;
 
   // Only present when the list is fetched with ?with_usage=true — the manage

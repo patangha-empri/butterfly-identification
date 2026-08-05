@@ -16,6 +16,7 @@ import '../../../../shared/widgets/sliver_section.dart';
 import '../../../../shared/widgets/states/empty_state.dart';
 import '../../data/models/species_detail.dart';
 import '../providers/species_providers.dart';
+import '../widgets/custom_fields_section.dart';
 import '../widgets/flight_calendar.dart';
 import '../widgets/species_gallery.dart';
 
@@ -204,6 +205,8 @@ List<Widget> _content(BuildContext context, WidgetRef ref, SpeciesDetail d) {
             .toList(),
       ),
     ],
+
+    CustomFieldsSection(detail: d),
 
     SpeciesInsightsCard.fromDetail(d),
   ];

@@ -31,6 +31,18 @@ def list_species():
     return paginated_response(items, total, page, per_page)
 
 
+@species_bp.get("/field-definitions")
+def list_public_field_definitions():
+    """
+    Labels and types for the custom fields marked visible in the app.
+
+    Species payloads carry only {field_key: value}; without this the app has no
+    way to title, order or format them. Fields left admin-only (the default)
+    never appear here, and their values are stripped from species responses.
+    """
+    return success_response(data=species_service.list_public_field_definitions())
+
+
 @species_bp.get("/<slug_or_id>")
 def get_species(slug_or_id):
     try:

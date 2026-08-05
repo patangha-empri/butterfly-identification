@@ -80,4 +80,14 @@ class FakeSpeciesRemoteDataSource implements ISpeciesRemoteDataSource {
     if (fail) throw Exception('network');
     return [species(10), species(11)];
   }
+
+  /// Admin-defined fields the backend has marked visible in the app. Empty by
+  /// default so existing tests see the detail page without the extra section.
+  List<SpeciesFieldDefinition> fieldDefinitions = const [];
+
+  @override
+  Future<List<SpeciesFieldDefinition>> fetchFieldDefinitions() async {
+    if (fail) throw Exception('network');
+    return fieldDefinitions;
+  }
 }

@@ -17,6 +17,7 @@ abstract class ISpeciesRemoteDataSource {
   Future<List<SpeciesSummary>> searchSpecies(String query, {int page});
   Future<SpeciesDetail> fetchDetail(String id);
   Future<List<SpeciesSummary>> fetchSimilar(String id);
+  Future<List<SpeciesFieldDefinition>> fetchFieldDefinitions();
 }
 
 class SpeciesRemoteDataSource implements ISpeciesRemoteDataSource {
@@ -78,5 +79,11 @@ class SpeciesRemoteDataSource implements ISpeciesRemoteDataSource {
   Future<List<SpeciesSummary>> fetchSimilar(String id) async {
     final res = await _dio.get<dynamic>(ApiEndpoints.speciesSimilar(id));
     return _list(res, SpeciesSummary.fromJson);
+  }
+
+  @override
+  Future<List<SpeciesFieldDefinition>> fetchFieldDefinitions() async {
+    final res = await _dio.get<dynamic>(ApiEndpoints.speciesFieldDefinitions);
+    return _list(res, SpeciesFieldDefinition.fromJson);
   }
 }

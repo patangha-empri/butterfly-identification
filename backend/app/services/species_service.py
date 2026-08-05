@@ -1,4 +1,6 @@
 """Species listing, filtering, and admin CRUD — via Supabase PostgREST."""
+import logging
+import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timezone
@@ -287,8 +289,12 @@ def list_species(filters: dict, page: int, per_page: int) -> tuple:
 
     res = query.execute()
     counts = _observation_counts([row["id"] for row in res.data])
+    visible = public_field_keys()
     items = [
-        _to_dict(row, include_related=True, observation_counts=counts) for row in res.data
+        _public_view(
+            _to_dict(row, include_related=True, observation_counts=counts), visible
+        )
+        for row in res.data
     ]
     return items, res.count or 0
 
@@ -315,7 +321,7 @@ def get_species(slug_or_id: str) -> dict:
         row = res.data[0] if res.data else None
     if not row:
         raise SpeciesError("Species not found.", 404)
-    return _to_dict(row, include_related=True)
+    return _public_view(_to_dict(row, include_related=True), public_field_keys())
 
 
 def get_species_admin(species_id: str) -> dict:
@@ -369,7 +375,8 @@ def get_similar_species(slug_or_id: str) -> list:
         )
         similar = res.data
 
-    return [_to_dict(s, include_related=True) for s in similar]
+    visible = public_field_keys()
+    return [_public_view(_to_dict(s, include_related=True), visible) for s in similar]
 
 
 # ── Admin CRUD ─────────────────────────────────────────────────────────────────
@@ -483,6 +490,92 @@ def activate_species(species_id: str) -> dict:
 # ── Custom field definitions ───────────────────────────────────────────────────
 # The shared vocabulary behind species.custom_fields. See migration 004.
 
+# Public reads need the visible key set on every species they serialise, which
+# would be one extra query per request. The vocabulary changes a few times a
+# week at most, so a short TTL is plenty.
+#
+# The cache is per process: an admin write busts it in the worker that served
+# the write, so the change is instant there, while other workers pick it up
+# within the TTL. That applies in both directions — a field switched back to
+# admin-only can still be served by a stale worker for up to TTL seconds, which
+# is why the window is kept this short. Fields holding anything that must never
+# be public should not be marked public in the first place.
+_PUBLIC_FIELD_CACHE = {"keys": None, "expires_at": 0.0}
+_PUBLIC_FIELD_TTL_SECONDS = 60
+
+
+def _invalidate_public_field_cache() -> None:
+    _PUBLIC_FIELD_CACHE["keys"] = None
+    _PUBLIC_FIELD_CACHE["expires_at"] = 0.0
+
+
+def public_field_keys() -> frozenset:
+    """Keys of the custom fields app users are allowed to see (active + public)."""
+    now = time.monotonic()
+    if _PUBLIC_FIELD_CACHE["keys"] is not None and now < _PUBLIC_FIELD_CACHE["expires_at"]:
+        return _PUBLIC_FIELD_CACHE["keys"]
+
+    try:
+        res = (
+            get_supabase()
+            .table("species_field_definitions")
+            .select("field_key")
+            .eq("is_active", True)
+            .eq("is_public", True)
+            .execute()
+        )
+        keys = frozenset(r["field_key"] for r in (res.data or []))
+    except Exception:
+        # Never fail a public species read over the vocabulary lookup — showing
+        # no custom fields is the safe degradation, showing all of them is not.
+        logging.getLogger(__name__).exception("public custom field lookup failed")
+        return frozenset()
+
+    _PUBLIC_FIELD_CACHE["keys"] = keys
+    _PUBLIC_FIELD_CACHE["expires_at"] = now + _PUBLIC_FIELD_TTL_SECONDS
+    return keys
+
+
+def _public_view(data: dict, visible_keys: frozenset) -> dict:
+    """
+    Strips custom fields the app is not meant to see.
+
+    Applied on the way out of the public endpoints rather than inside _to_dict,
+    so the admin panel keeps seeing everything through the same serializer.
+    """
+    values = data.get("custom_fields") or {}
+    data["custom_fields"] = {k: v for k, v in values.items() if k in visible_keys}
+    return data
+
+
+def list_public_field_definitions() -> list:
+    """
+    The definitions behind the custom fields the app may render — label, type,
+    grouping and order. Values alone are useless to a client: it would have a
+    key like `wing_texture` and no way to title or format it.
+    """
+    res = (
+        get_supabase()
+        .table("species_field_definitions")
+        .select("*")
+        .eq("is_active", True)
+        .eq("is_public", True)
+        .order("sort_order")
+        .order("label")
+        .execute()
+    )
+    return [
+        {
+            "field_key": r["field_key"],
+            "label": r["label"],
+            "field_type": r.get("field_type", "text"),
+            "help_text": r.get("help_text"),
+            "group_name": r.get("group_name") or "Custom fields",
+            "sort_order": r.get("sort_order", 0),
+        }
+        for r in res.data
+    ]
+
 def _field_definition_to_dict(row: dict) -> dict:
     return {
         "id": row["id"],
@@ -493,6 +586,9 @@ def _field_definition_to_dict(row: dict) -> dict:
         "group_name": row.get("group_name") or "Custom fields",
         "sort_order": row.get("sort_order", 0),
         "is_active": row.get("is_active", True),
+        # Whether app users see this field at all. Defaults to False so a field
+        # invented for internal use never reaches the app by accident (005).
+        "is_public": row.get("is_public", False),
         "created_at": row.get("created_at"),
     }
 
@@ -655,11 +751,14 @@ def create_field_definition(data: dict, admin_id: str) -> dict:
         "group_name": data.get("group_name") or "Custom fields",
         "sort_order": data.get("sort_order", 0),
         "is_active": True,
+        "is_public": data.get("is_public", False),
         "created_by": admin_id,
         "created_at": now,
         "updated_at": now,
     }
     res = sb.table("species_field_definitions").insert(row).execute()
+    if row["is_public"]:
+        _invalidate_public_field_cache()
     return _field_definition_to_dict(res.data[0])
 
 
@@ -673,11 +772,16 @@ def update_field_definition(definition_id: str, data: dict) -> dict:
     if not existing.data:
         raise SpeciesError("Custom field not found.", 404)
 
-    allowed = {"label", "field_type", "help_text", "group_name", "sort_order", "is_active"}
+    allowed = {
+        "label", "field_type", "help_text", "group_name", "sort_order",
+        "is_active", "is_public",
+    }
     update_fields = {k: v for k, v in data.items() if k in allowed}
     update_fields["updated_at"] = datetime.now(timezone.utc).isoformat()
 
     sb.table("species_field_definitions").update(update_fields).eq("id", definition_id).execute()
+    if "is_public" in update_fields or "is_active" in update_fields:
+        _invalidate_public_field_cache()
     res = sb.table("species_field_definitions").select("*").eq("id", definition_id).execute()
     return _field_definition_to_dict(res.data[0])
 
@@ -728,6 +832,8 @@ def delete_field_definition(
     sb = get_supabase()
     definition = _get_field_definition(definition_id)
     key = definition["field_key"]
+    # Every mode ends with the field gone from the app's vocabulary.
+    _invalidate_public_field_cache()
 
     if mode == "retire":
         sb.table("species_field_definitions").update({

@@ -76,6 +76,24 @@ final similarSpeciesProvider =
   name: 'similarSpecies',
 );
 
+/// Labels and types for the admin-defined fields the app is allowed to show.
+///
+/// Kept alive rather than autoDispose: the vocabulary is the same for every
+/// species, so re-fetching it on each detail page would be wasted requests. An
+/// empty list on failure simply hides the section — a species page must not
+/// fail over an optional block.
+final speciesFieldDefinitionsProvider =
+    FutureProvider<List<SpeciesFieldDefinition>>(
+  (ref) async {
+    try {
+      return await ref.read(speciesRemoteDataSourceProvider).fetchFieldDefinitions();
+    } catch (_) {
+      return <SpeciesFieldDefinition>[];
+    }
+  },
+  name: 'speciesFieldDefinitions',
+);
+
 // ── Paginated list state + notifier ──────────────────────────────────────────
 
 enum SpeciesListStatus { initial, loading, loadingMore, success, error }

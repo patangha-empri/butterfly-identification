@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Pencil, Trash2 } from "lucide-react";
+import { Eye, Loader2, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import api, { apiErrorMessage } from "@/lib/api";
@@ -109,6 +109,11 @@ export function ManageFieldsDialog({
                             hidden
                           </Badge>
                         )}
+                        {def.is_public && def.is_active !== false && (
+                          <Badge variant="outline" className="h-4 gap-0.5 px-1 text-[9px]">
+                            <Eye size={9} /> in app
+                          </Badge>
+                        )}
                       </div>
                       <p className="text-[10px] text-muted-foreground">
                         {def.field_type}
@@ -205,6 +210,7 @@ function EditFieldDialog({
   const [helpText, setHelpText] = useState("");
   const [groupName, setGroupName] = useState("");
   const [sortOrder, setSortOrder] = useState("0");
+  const [isPublic, setIsPublic] = useState(false);
   const [loadedFor, setLoadedFor] = useState<string | null>(null);
 
   // Seed the inputs the first time a given definition is opened, without an
@@ -215,6 +221,7 @@ function EditFieldDialog({
     setHelpText(definition.help_text ?? "");
     setGroupName(definition.group_name ?? "");
     setSortOrder(String(definition.sort_order ?? 0));
+    setIsPublic(definition.is_public === true);
   }
   if (!definition && loadedFor !== null) setLoadedFor(null);
 
@@ -272,6 +279,18 @@ function EditFieldDialog({
               />
             </div>
           </div>
+
+          <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border p-2.5">
+            <Switch checked={isPublic} onCheckedChange={setIsPublic} className="mt-0.5" />
+            <span className="space-y-0.5">
+              <span className="block text-xs font-medium">Show in the app</span>
+              <span className="block text-[11px] leading-relaxed text-muted-foreground">
+                App users see this field on the species page. Leave it off for
+                anything meant for your team only — review notes, data quality
+                flags, internal rankings.
+              </span>
+            </span>
+          </label>
         </div>
 
         <DialogFooter>
@@ -287,6 +306,7 @@ function EditFieldDialog({
                 help_text: helpText.trim() || null,
                 group_name: groupName.trim() || "Custom fields",
                 sort_order: Number(sortOrder) || 0,
+                is_public: isPublic,
               })
             }
           >

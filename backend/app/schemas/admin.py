@@ -190,6 +190,9 @@ class FieldDefinitionCreateSchema(ma.Schema):
     help_text = fields.Str(allow_none=True, validate=validate.Length(max=500))
     group_name = fields.Str(allow_none=True, validate=validate.Length(max=100))
     sort_order = fields.Int(load_default=0)
+    # Off unless asked for: a new field is admin-only until someone decides the
+    # app should show it (migration 005).
+    is_public = fields.Bool(load_default=False)
 
 
 class FieldDefinitionUpdateSchema(ma.Schema):
@@ -199,6 +202,7 @@ class FieldDefinitionUpdateSchema(ma.Schema):
     group_name = fields.Str(allow_none=True, validate=validate.Length(max=100))
     sort_order = fields.Int()
     is_active = fields.Bool()
+    is_public = fields.Bool()
 
 
 class FieldValuesClearSchema(ma.Schema):
