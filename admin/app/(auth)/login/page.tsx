@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 
 import api, { apiErrorMessage } from "@/lib/api";
-import { setTokens, setCurrentUser, isStaff, getToken } from "@/lib/auth";
+import { setTokens, setCurrentUser, isStaff, hasSession, clearAuth } from "@/lib/auth";
 import { assetUrl, hardRedirect } from "@/lib/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,9 +43,24 @@ function LoginForm() {
 
   // Already signed in? Skip the form. The proxy used to do this, but proxies
   // don't run under a static export.
+  //
+  // hasSession(), not getToken(): an expired access token still counts as
+  // signed in while the refresh token holds, and the dashboard guard will renew
+  // it on arrival.
   useEffect(() => {
-    if (getToken()) hardRedirect("/dashboard");
-  }, []);
+    if (hasSession()) {
+      hardRedirect("/dashboard");
+      return;
+    }
+    // Landed here because something expired rather than by choice. Say so —
+    // an unexplained login screen reads as a bug.
+    if (searchParams.get("session") === "expired") {
+      // Stale credentials are what sent us here; don't leave them to confuse
+      // the next hasSession() check.
+      clearAuth();
+      toast.info("Your session expired. Please sign in again.");
+    }
+  }, [searchParams]);
 
   async function onSubmit(data: LoginForm) {
     try {

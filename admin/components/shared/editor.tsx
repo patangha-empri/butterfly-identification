@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type EditorJS from "@editorjs/editorjs";
-import { getToken } from "@/lib/auth";
+import { API_BASE_URL, ensureAccessToken } from "@/lib/session";
 
 interface EditorProps {
   value: string; // JSON string
@@ -51,8 +51,6 @@ export function Editor({
           }
         }
 
-        const token = getToken();
-
         const editor = new EditorJSClass({
           holder: containerRef.current!,
           placeholder,
@@ -82,12 +80,36 @@ export function Editor({
             image: {
               class: ImageClass as any,
               config: {
-                endpoints: {
-                  byFile: `${process.env.NEXT_PUBLIC_API_URL ?? "https://staging.thirdeyegfx.in/butterfly_backend"}/api/v1/admin/cms/articles/upload-image`,
-                },
-                field: "image",
-                additionalRequestHeaders: {
-                  Authorization: token ? `Bearer ${token}` : "",
+                // A custom uploader rather than `endpoints.byFile`, because
+                // that form only accepts static `additionalRequestHeaders`
+                // captured at mount. An article editor stays open for a long
+                // time, so a token baked in here is stale by the time anyone
+                // drops an image in — the upload 401s while the rest of the
+                // page still works. Resolving the token per upload means it is
+                // always live, refreshed first if need be.
+                uploader: {
+                  async uploadByFile(file: File) {
+                    const token = await ensureAccessToken();
+                    const body = new FormData();
+                    body.append("image", file);
+
+                    const res = await fetch(
+                      `${API_BASE_URL}/admin/cms/articles/upload-image`,
+                      {
+                        method: "POST",
+                        body,
+                        headers: token ? { Authorization: `Bearer ${token}` } : {},
+                      }
+                    );
+                    if (!res.ok) return { success: 0 };
+
+                    const json = (await res.json()) as {
+                      data?: { url?: string };
+                      file?: { url?: string };
+                    };
+                    const url = json.data?.url ?? json.file?.url;
+                    return url ? { success: 1, file: { url } } : { success: 0 };
+                  },
                 },
               },
             },

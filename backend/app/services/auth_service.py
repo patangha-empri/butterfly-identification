@@ -112,12 +112,24 @@ def login(email: str, password: str) -> dict:
     }
 
 
-def refresh_access_token(user_id: str) -> str:
-    """Generate a new access token for an existing user."""
+def refresh_access_token(user_id: str) -> dict:
+    """
+    Issue a new access token — and a rotated refresh token — for an existing user.
+
+    Rotation means an active session never has to send the user back to /login:
+    each refresh pushes the 30-day refresh window forward, so the session only
+    lapses after 30 days of genuine inactivity. Callers that predate rotation can
+    ignore the extra field; the account checks below still make a suspended or
+    deactivated user's refresh fail closed.
+    """
     user = get_user_row(user_id)
     if not user or not user.get("is_active") or user.get("is_suspended"):
         raise AuthError("Cannot refresh token for this account.", 401)
-    return create_access_token(identity=user_id)
+    return {
+        "access_token": create_access_token(identity=user_id),
+        "refresh_token": create_refresh_token(identity=user_id),
+        "user": user_to_dict(user, include_private=True),
+    }
 
 
 def change_password(user_id: str, current_password: str, new_password: str) -> None:

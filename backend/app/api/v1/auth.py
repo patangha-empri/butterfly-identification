@@ -69,13 +69,20 @@ def login():
 @auth_bp.post("/refresh")
 @jwt_required(refresh=True)
 def refresh():
-    """Exchange a refresh token for a new access token."""
+    """
+    Exchange a refresh token for a fresh access token plus a rotated refresh token.
+
+    Send the *refresh* token in the Authorization header (`Bearer <refresh>`),
+    not in the body — flask_jwt_extended reads headers only (JWT_TOKEN_LOCATION).
+    The response also carries `user` so clients can keep their cached profile
+    (role, suspension state) current without a second /auth/me round-trip.
+    """
     user_id = get_jwt_identity()
     try:
-        access_token = auth_service.refresh_access_token(user_id)
+        tokens = auth_service.refresh_access_token(user_id)
     except auth_service.AuthError as e:
         return error_response(e.message, e.status_code)
-    return success_response(data={"access_token": access_token})
+    return success_response(data=tokens)
 
 
 @auth_bp.get("/me")

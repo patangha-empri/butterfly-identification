@@ -133,6 +133,29 @@ class TestProtectedEndpoints:
         assert r.status_code == 200
         assert "access_token" in r.get_json()["data"]
 
+    def test_refresh_rotates_refresh_token(self, client, regular_user_creds):
+        """A refresh hands back a *new* refresh token, so an active session
+        keeps sliding its 30-day window forward instead of hard-expiring."""
+        login = client.post("/api/v1/auth/login", json={
+            "email": regular_user_creds["email"],
+            "password": regular_user_creds["password"],
+        })
+        original = login.get_json()["data"]["refresh_token"]
+
+        r = client.post("/api/v1/auth/refresh",
+                        headers={"Authorization": f"Bearer {original}"})
+        data = r.get_json()["data"]
+
+        assert data["refresh_token"] != original
+        # …and the rotated token is itself usable, or clients would be stranded
+        # after the first refresh.
+        again = client.post("/api/v1/auth/refresh",
+                            headers={"Authorization": f"Bearer {data['refresh_token']}"})
+        assert again.status_code == 200
+        # The profile rides along so clients can catch a role change or a
+        # suspension without a second /auth/me call.
+        assert data["user"]["email"] == regular_user_creds["email"]
+
     def test_refresh_with_access_token_fails(self, client, auth):
         r = client.post("/api/v1/auth/refresh", headers=auth)
         assert r.status_code == 422  # wrong token type

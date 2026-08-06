@@ -6,8 +6,9 @@ import { AppLink } from "@/components/shared/app-link";
 import { Menu, LogOut, User as UserIcon } from "lucide-react";
 import { toast } from "sonner";
 
+import api from "@/lib/api";
 import { getCurrentUser, clearAuth } from "@/lib/auth";
-import { hardRedirect, normalizePath } from "@/lib/navigation";
+import { appUrl, normalizePath } from "@/lib/navigation";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -56,10 +57,26 @@ export function Header() {
     setUser(getCurrentUser());
   }, [pathname]);
 
-  function handleLogout() {
+  const [signingOut, setSigningOut] = useState(false);
+
+  async function handleLogout() {
+    if (signingOut) return;
+    setSigningOut(true);
+
+    // Tell the backend first — JWTs are stateless here, so this is advisory
+    // (it records the event), and it must not be able to strand the user in a
+    // signed-in UI. Clear locally no matter how it goes.
+    try {
+      await api.post("/auth/logout");
+    } catch {
+      // Offline, or the token already expired. Either way we're signing out.
+    }
+
     clearAuth();
     toast.success("Signed out successfully.");
-    hardRedirect("/login");
+    // replace(), not href: the dashboard must not be one Back press away with
+    // a dead token, which would just render the guard's blank screen.
+    window.location.replace(appUrl("/login"));
   }
 
   const initials = user?.full_name
@@ -114,11 +131,17 @@ export function Header() {
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
-            onClick={handleLogout}
+            onClick={(e) => {
+              // Keep the menu open while the logout request is in flight, so
+              // the item can't be clicked a second time mid-sign-out.
+              e.preventDefault();
+              void handleLogout();
+            }}
+            disabled={signingOut}
             className="gap-2 text-destructive focus:text-destructive"
           >
             <LogOut size={14} />
-            Sign out
+            {signingOut ? "Signing out…" : "Sign out"}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

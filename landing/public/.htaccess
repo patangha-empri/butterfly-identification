@@ -1,8 +1,51 @@
+# Apache config for the landing site's static export on cPanel.
+#
+# This file governs the *document root*. The admin panel is a separate export
+# living in /admin/ with its own .htaccess; requests for it fall through rule 4
+# below (the directory exists) and are handled there.
+#
+# next build copies this into out/; edit it here, never in out/.
+#
+# ── DEPLOY WARNING ───────────────────────────────────────────────────────────
+# The contents of landing/out/ go in the document root; admin/out/ goes in
+# /admin/. Uploading admin/out/ to the root overwrites index.html with the
+# admin shell, and the home page turns into a blank screen that reports
+# ChunkLoadError — the admin document asks for /admin/_next/… chunks that the
+# root has no copy of. Keep the two uploads separate.
+
+# ── Caching ──────────────────────────────────────────────────────────────────
+# LiteSpeed sends no Cache-Control for static files, only Last-Modified, which
+# leaves browsers free to *heuristically* cache the HTML entry documents. That
+# breaks every redeploy: a returning visitor keeps the previous build's app
+# shell while the server serves the new chunk graph, and the mismatch kills the
+# render — a working site that goes blank only for people who visited before.
+# Be explicit instead. (Mirrors admin/public/.htaccess.)
+<IfModule mod_headers.c>
+  # Entry documents and RSC payloads change on every deploy but keep the same
+  # URL, so they must be revalidated. no-cache still allows a 304 — it means
+  # "check with the server", not "never store".
+  <FilesMatch "\.(html|txt)$">
+    Header set Cache-Control "no-cache, must-revalidate"
+  </FilesMatch>
+
+  # Everything under _next/static is content-hashed: a change to the content
+  # produces a new filename, so these are safe to keep forever.
+  <FilesMatch "\.(js|css|woff2?)$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+
+  # public/ assets keep stable names, so they need revalidation or an image
+  # swap would never reach returning visitors.
+  <FilesMatch "\.(png|jpe?g|gif|svg|ico|webp|avif)$">
+    Header set Cache-Control "public, max-age=86400, must-revalidate"
+  </FilesMatch>
+</IfModule>
+
 <IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteBase /
 
-  # 1. Force HTTPS (Handles standard SSL and HTTPS reverse proxies)
+  # 1. Force HTTPS (handles standard SSL and HTTPS reverse proxies)
   RewriteCond %{HTTPS} !=on
   RewriteCond %{HTTP:X-Forwarded-Proto} !https
   RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
@@ -15,11 +58,23 @@
   RewriteCond %{REQUEST_FILENAME} -d
   RewriteRule ^(.*[^/])$ https://%{HTTP_HOST}/$1/ [R=301,L]
 
-  # 4. Serve existing files and directories directly
+  # 4. Serve existing files and directories directly. /admin/ is a real
+  #    directory, so admin requests stop here and its own .htaccess takes over.
   RewriteCond %{REQUEST_FILENAME} -f [OR]
   RewriteCond %{REQUEST_FILENAME} -d
   RewriteRule ^ - [L]
 
-  # 5. Fallback to custom 404
-  RewriteRule ^ /404.html [L]
+  # 5. Anything reaching here genuinely does not exist. Stop rewriting and let
+  #    Apache issue a real 404 — ErrorDocument below still serves the styled
+  #    page, but with the correct status.
+  #
+  #    Do NOT rewrite to /404.html here. An internal rewrite returns HTTP 200
+  #    with an HTML body, so a request for a missing build asset (e.g. a stale
+  #    chunk referenced by a heuristically cached document) hands the browser
+  #    HTML where it expects JavaScript. The script then dies on a parse error
+  #    instead of degrading gracefully, which surfaces as a blank page.
+  RewriteRule ^ - [L]
 </IfModule>
+
+# Styled 404 page, served with an honest 404 status.
+ErrorDocument 404 /404.html
