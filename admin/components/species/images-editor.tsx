@@ -52,8 +52,8 @@ export function SpeciesImagesEditor({ species }: { species: Species }) {
       fd.append("image", file);
       fd.append("image_type", imageType);
       if (credit.trim()) fd.append("credit", credit.trim());
-      // No Content-Type here on purpose — axios strips it for FormData so the
-      // browser can add the multipart boundary.
+      // No Content-Type here on purpose — the request interceptor in lib/api.ts
+      // clears it for FormData so the browser can add the multipart boundary.
       const res = await api.post<ApiResponse<SpeciesImage>>(
         `/admin/species/${species.id}/images`,
         fd

@@ -35,6 +35,15 @@ type RetriableConfig = InternalAxiosRequestConfig & { _retried?: boolean };
 // EXPIRY_SKEW_SECONDS of it) is renewed before the request leaves the browser,
 // so expiry is invisible for as long as the 30-day refresh token lives.
 api.interceptors.request.use(async (config) => {
+  // The instance defaults to application/json, and axios treats that as an
+  // instruction rather than a default: a FormData body sent with a JSON content
+  // type is run through formDataToJSON instead of being posted as multipart,
+  // which turns an uploaded File into `{}` and loses the file entirely. Clearing
+  // the header lets the browser set multipart/form-data plus its boundary.
+  if (typeof FormData !== "undefined" && config.data instanceof FormData) {
+    config.headers.setContentType(null);
+  }
+
   if (isAuthEndpoint(config.url)) return config;
 
   const token = await ensureAccessToken().catch(() => getToken());
