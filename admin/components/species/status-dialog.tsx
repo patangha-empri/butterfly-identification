@@ -15,7 +15,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import type { Species } from "@/types";
+import type { PaginationMeta, Species } from "@/types";
 
 /**
  * Confirmation for toggling app visibility or soft-deleting a species.
@@ -54,16 +54,46 @@ export function SpeciesStatusDialog({
       const isActive = !deactivating;
 
       // Patch the cache before refetching so the row updates immediately.
-      qc.setQueriesData<{ species: Species[] }>({ queryKey: ["species"] }, (old) =>
-        old && Array.isArray(old.species)
-          ? {
-              ...old,
-              species: old.species.map((s) =>
-                s.id === id ? { ...s, is_active: isActive } : s
-              ),
+      //
+      // Flipping is_active in place is not enough on a filtered list: the
+      // species list is keyed ["species", page, search, status], and on the
+      // default "active" tab a just-deleted species would sit there wearing an
+      // "Inactive" badge until the refetch landed. Against a cold backend that
+      // is several seconds of looking like the delete did nothing. So when the
+      // row no longer matches that list's own filter, drop it and correct the
+      // count; other tabs ("all", "inactive") keep it and just update the flag.
+      qc.getQueryCache()
+        .findAll({ queryKey: ["species"] })
+        .forEach((query) => {
+          const listStatus = query.queryKey[3] as string | undefined;
+          qc.setQueryData<{ species: Species[]; meta?: PaginationMeta }>(
+            query.queryKey,
+            (old) => {
+              if (!old || !Array.isArray(old.species)) return old;
+              if (!old.species.some((s) => s.id === id)) return old;
+
+              const nowMismatched =
+                (listStatus === "active" && !isActive) ||
+                (listStatus === "inactive" && isActive);
+
+              if (nowMismatched) {
+                return {
+                  ...old,
+                  species: old.species.filter((s) => s.id !== id),
+                  meta: old.meta
+                    ? { ...old.meta, total: Math.max(0, old.meta.total - 1) }
+                    : old.meta,
+                };
+              }
+              return {
+                ...old,
+                species: old.species.map((s) =>
+                  s.id === id ? { ...s, is_active: isActive } : s
+                ),
+              };
             }
-          : old
-      );
+          );
+        });
       qc.setQueriesData<Species>({ queryKey: ["species-detail"] }, (old) =>
         old && old.id === id ? { ...old, is_active: isActive } : old
       );
