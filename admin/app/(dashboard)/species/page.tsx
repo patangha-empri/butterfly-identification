@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Eye, EyeOff, Pencil, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { Eye, EyeOff, Pencil, Plus, RotateCcw } from "lucide-react";
 import { AppLink } from "@/components/shared/app-link";
 
 import api from "@/lib/api";
@@ -38,7 +38,6 @@ export default function SpeciesPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Species | null>(null);
   const [statusTarget, setStatusTarget] = useState<Species | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<Species | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ["species", page, search, status],
@@ -57,12 +56,11 @@ export default function SpeciesPage() {
     },
   });
 
-  // `editing`/`statusTarget`/`deleteTarget` are snapshots taken at click time.
+  // `editing`/`statusTarget` are snapshots taken at click time.
   const live = (s: Species | null) =>
     s ? (data?.species.find((row) => row.id === s.id) ?? s) : null;
   const editingLive = live(editing);
   const statusTargetLive = live(statusTarget);
-  const deleteTargetLive = live(deleteTarget);
 
   function openCreate() {
     setEditing(null);
@@ -166,14 +164,6 @@ export default function SpeciesPage() {
               <EyeOff size={14} className="text-amber-600" />
             )}
           </Button>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            title="Delete species (soft-delete and hide everywhere)"
-            onClick={() => setDeleteTarget(s)}
-          >
-            <Trash2 size={14} className="text-red-600" />
-          </Button>
         </div>
       ),
     },
@@ -246,13 +236,6 @@ export default function SpeciesPage() {
         species={statusTargetLive}
         open={Boolean(statusTarget)}
         onOpenChange={(o) => !o && setStatusTarget(null)}
-      />
-
-      <SpeciesStatusDialog
-        species={deleteTargetLive}
-        open={Boolean(deleteTarget)}
-        onOpenChange={(o) => !o && setDeleteTarget(null)}
-        mode="delete"
       />
     </div>
   );

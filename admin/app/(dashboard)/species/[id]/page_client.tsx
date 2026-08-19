@@ -4,7 +4,7 @@ import { use, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import {
-  ArrowLeft, Bug, EyeOff, Leaf, Map as MapIcon, Pencil, RotateCcw, ShieldCheck, Trash2,
+  ArrowLeft, Bug, EyeOff, Leaf, Map as MapIcon, Pencil, RotateCcw, ShieldCheck,
 } from "lucide-react";
 import { AppLink } from "@/components/shared/app-link";
 
@@ -49,7 +49,6 @@ export default function SpeciesDetailPage({ params }: { params: Promise<{ id: st
 
   const [formOpen, setFormOpen] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
-  const [deleteOpen, setDeleteOpen] = useState(false);
 
   const { data: species, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["species-detail", id],
@@ -107,14 +106,6 @@ export default function SpeciesDetailPage({ params }: { params: Promise<{ id: st
             ) : (
               <><EyeOff size={14} className="mr-1" /> Set inactive</>
             )}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
-            onClick={() => setDeleteOpen(true)}
-          >
-            <Trash2 size={14} className="mr-1" /> Delete
           </Button>
         </div>
       </div>
@@ -318,13 +309,6 @@ export default function SpeciesDetailPage({ params }: { params: Promise<{ id: st
         species={species}
         open={statusOpen}
         onOpenChange={setStatusOpen}
-      />
-
-      <SpeciesStatusDialog
-        species={species}
-        open={deleteOpen}
-        onOpenChange={setDeleteOpen}
-        mode="delete"
       />
     </div>
   );
