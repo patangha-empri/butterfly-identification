@@ -383,8 +383,15 @@ def get_similar_species(slug_or_id: str) -> list:
 
 def create_species(data: dict, admin_id: str) -> dict:
     sb = get_supabase()
-    existing = sb.table("species").select("id").eq("scientific_name", data["scientific_name"]).execute()
+    existing = sb.table("species").select("id, is_active").eq("scientific_name", data["scientific_name"]).execute()
     if existing.data:
+        is_act = existing.data[0].get("is_active", True)
+        if not is_act:
+            raise SpeciesError(
+                "A deactivated (deleted) species with this scientific name already exists in the archive. "
+                "You can reactivate it from the inactive species filter or use a different scientific name.",
+                409,
+            )
         raise SpeciesError("A species with this scientific name already exists.", 409)
 
     slug = slugify(data["common_name"])

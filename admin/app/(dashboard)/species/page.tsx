@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Eye, EyeOff, Pencil, Plus, RotateCcw } from "lucide-react";
+import { Eye, EyeOff, Pencil, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { AppLink } from "@/components/shared/app-link";
 
 import api from "@/lib/api";
@@ -34,10 +34,11 @@ type StatusFilter = "all" | "active" | "inactive";
 export default function SpeciesPage() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState<StatusFilter>("all");
+  const [status, setStatus] = useState<StatusFilter>("active");
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Species | null>(null);
   const [statusTarget, setStatusTarget] = useState<Species | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Species | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ["species", page, search, status],
@@ -56,14 +57,12 @@ export default function SpeciesPage() {
     },
   });
 
-  // `editing`/`statusTarget` are snapshots taken at click time, so they go stale
-  // as soon as a dialog mutates the species (uploading an image, toggling
-  // status). Prefer the row from the latest fetch and keep the snapshot only as
-  // a fallback for when a filter has since removed it from the page.
+  // `editing`/`statusTarget`/`deleteTarget` are snapshots taken at click time.
   const live = (s: Species | null) =>
     s ? (data?.species.find((row) => row.id === s.id) ?? s) : null;
   const editingLive = live(editing);
   const statusTargetLive = live(statusTarget);
+  const deleteTargetLive = live(deleteTarget);
 
   function openCreate() {
     setEditing(null);
@@ -135,7 +134,7 @@ export default function SpeciesPage() {
     {
       key: "actions",
       header: "",
-      className: "w-28",
+      className: "w-36",
       cell: (s) => (
         <div className="flex items-center gap-0.5">
           <Button variant="ghost" size="icon-sm" asChild title="View details">
@@ -166,6 +165,14 @@ export default function SpeciesPage() {
             ) : (
               <EyeOff size={14} className="text-amber-600" />
             )}
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            title="Delete species (soft-delete and hide everywhere)"
+            onClick={() => setDeleteTarget(s)}
+          >
+            <Trash2 size={14} className="text-red-600" />
           </Button>
         </div>
       ),
@@ -202,9 +209,9 @@ export default function SpeciesPage() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All species</SelectItem>
             <SelectItem value="active">Active — in the app</SelectItem>
             <SelectItem value="inactive">Inactive — hidden</SelectItem>
+            <SelectItem value="all">All species</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -239,6 +246,13 @@ export default function SpeciesPage() {
         species={statusTargetLive}
         open={Boolean(statusTarget)}
         onOpenChange={(o) => !o && setStatusTarget(null)}
+      />
+
+      <SpeciesStatusDialog
+        species={deleteTargetLive}
+        open={Boolean(deleteTarget)}
+        onOpenChange={(o) => !o && setDeleteTarget(null)}
+        mode="delete"
       />
     </div>
   );

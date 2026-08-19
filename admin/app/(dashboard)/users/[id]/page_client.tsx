@@ -17,6 +17,7 @@ import {
   UserX,
 } from "lucide-react";
 import { AppLink } from "@/components/shared/app-link";
+import { QueryError } from "@/components/shared/query-error";
 
 import api, { apiErrorMessage } from "@/lib/api";
 import { routeId } from "@/lib/navigation";
@@ -61,7 +62,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
   const [warnOpen, setWarnOpen] = useState(false);
   const [flagOpen, setFlagOpen] = useState(false);
 
-  const { data: user, isLoading } = useQuery({
+  const { data: user, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["user", id],
     queryFn: async () => {
       const res = await api.get<ApiResponse<User>>(`/admin/users/${id}`);
@@ -155,6 +156,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
     );
   }
 
+  if (isError) return <QueryError error={error} entity="User" onRetry={() => refetch()} />;
   if (!user) return <div className="p-6 text-muted-foreground">User not found.</div>;
 
   const warnings = user.active_warnings ?? 0;

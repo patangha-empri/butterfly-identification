@@ -23,6 +23,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { AppLink } from "@/components/shared/app-link";
+import { QueryError } from "@/components/shared/query-error";
 
 import api, { apiErrorMessage } from "@/lib/api";
 import { hardRedirect, routeId } from "@/lib/navigation";
@@ -86,7 +87,7 @@ export default function ObservationDetailPage({ params }: { params: Promise<{ id
   const qc = useQueryClient();
   const [editOpen, setEditOpen] = useState(false);
 
-  const { data: obs, isLoading } = useQuery({
+  const { data: obs, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["observation", id],
     queryFn: async () => {
       // There is no /admin/observations/:id detail route; the public endpoint
@@ -212,6 +213,7 @@ export default function ObservationDetailPage({ params }: { params: Promise<{ id
     );
   }
 
+  if (isError) return <QueryError error={error} entity="Observation" onRetry={() => refetch()} />;
   if (!obs) return <div className="p-6 text-muted-foreground">Observation not found.</div>;
 
   const statusInfo = STATUS_COLORS[obs.verification_status] ?? "";

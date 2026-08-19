@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { Eye, EyeOff, Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import api, { apiErrorMessage } from "@/lib/api";
@@ -18,25 +18,27 @@ import {
 import type { Species } from "@/types";
 
 /**
- * Confirmation for the only destructive-looking action on a species.
+ * Confirmation for toggling app visibility or soft-deleting a species.
  *
- * It spells out the consequence in full because "deactivate" reads as "delete"
- * to most people: the record stays, observations keep working, and it can be
- * undone. Nothing here removes data.
+ * Soft deletion sets is_active = False so the species hides everywhere while
+ * preserving database records and observation history intact.
  */
 export function SpeciesStatusDialog({
   species,
   open,
   onOpenChange,
   onDone,
+  mode = "status",
 }: {
   species: Species | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onDone?: () => void;
+  mode?: "status" | "delete";
 }) {
   const qc = useQueryClient();
-  const deactivating = species?.is_active !== false;
+  const isDeleteMode = mode === "delete";
+  const deactivating = isDeleteMode || species?.is_active !== false;
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -51,13 +53,7 @@ export function SpeciesStatusDialog({
       const id = species!.id;
       const isActive = !deactivating;
 
-      // Patch the cache before refetching so the badge flips immediately.
-      // Invalidation alone left the old value on screen for seconds — the admin
-      // list counts observations for every row, so its refetch is not instant —
-      // and that read as the toggle having done nothing. The invalidations below
-      // still run, so the server stays the source of truth; this only covers the
-      // gap. A row filtered out by the current status filter self-corrects when
-      // the refetch lands.
+      // Patch the cache before refetching so the row updates immediately.
       qc.setQueriesData<{ species: Species[] }>({ queryKey: ["species"] }, (old) =>
         old && Array.isArray(old.species)
           ? {
@@ -73,9 +69,11 @@ export function SpeciesStatusDialog({
       );
 
       toast.success(
-        deactivating
-          ? `“${species?.common_name}” is now hidden from the mobile app.`
-          : `“${species?.common_name}” is visible in the mobile app again.`
+        isDeleteMode
+          ? `“${species?.common_name}” deleted (hidden everywhere).`
+          : deactivating
+            ? `“${species?.common_name}” is now hidden from the mobile app.`
+            : `“${species?.common_name}” is visible in the mobile app again.`
       );
       qc.invalidateQueries({ queryKey: ["species"] });
       qc.invalidateQueries({ queryKey: ["species-detail"] });
@@ -94,13 +92,42 @@ export function SpeciesStatusDialog({
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2">
-            {deactivating ? <EyeOff size={17} /> : <Eye size={17} />}
-            {deactivating ? "Hide" : "Show"} “{species.common_name}”{" "}
-            {deactivating ? "from" : "in"} the mobile app?
+            {isDeleteMode ? (
+              <Trash2 size={17} className="text-red-600" />
+            ) : deactivating ? (
+              <EyeOff size={17} />
+            ) : (
+              <Eye size={17} />
+            )}
+            {isDeleteMode
+              ? `Delete species “${species.common_name}”?`
+              : `${deactivating ? "Hide" : "Show"} “${species.common_name}” ${
+                  deactivating ? "from" : "in"
+                } the mobile app?`}
           </AlertDialogTitle>
           <AlertDialogDescription asChild>
             <div className="space-y-3 text-sm">
-              {deactivating ? (
+              {isDeleteMode ? (
+                <>
+                  <p>Deleting this species will soft-delete it and hide it everywhere:</p>
+                  <ul className="list-disc space-y-1 pl-5 text-muted-foreground">
+                    <li>
+                      It will be hidden from the mobile app, public portal, AI suggestions,
+                      and standard admin lists.
+                    </li>
+                    <li>
+                      Its {observations > 0 ? <strong>{observations}</strong> : "0"}{" "}
+                      existing observation{observations === 1 ? "" : "s"}{" "}
+                      {observations === 1 ? "stays" : "stay"} safely preserved in the database
+                      — nothing is deleted or unlinked.
+                    </li>
+                    <li>
+                      It can be viewed and restored at any time from the{" "}
+                      <strong>Inactive — hidden</strong> species filter tab.
+                    </li>
+                  </ul>
+                </>
+              ) : deactivating ? (
                 <>
                   <p>Setting this species to Inactive means:</p>
                   <ul className="list-disc space-y-1 pl-5 text-muted-foreground">
@@ -138,10 +165,20 @@ export function SpeciesStatusDialog({
               mutation.mutate();
             }}
             disabled={mutation.isPending}
-            className={deactivating ? "bg-amber-600 hover:bg-amber-700" : ""}
+            className={
+              isDeleteMode
+                ? "bg-red-600 hover:bg-red-700 text-white"
+                : deactivating
+                  ? "bg-amber-600 hover:bg-amber-700"
+                  : ""
+            }
           >
             {mutation.isPending && <Loader2 className="mr-2 size-4 animate-spin" />}
-            {deactivating ? "Set to Inactive" : "Reactivate"}
+            {isDeleteMode
+              ? "Delete Species"
+              : deactivating
+                ? "Set to Inactive"
+                : "Reactivate"}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

@@ -1,0 +1,35 @@
+status,name_as_reported,in_database_as,reason,india_gbif_records,action
+IN DATABASE,Chilades laius,Chilades lajus,spelling variant,2677,Add the reported name as a searchable synonym
+IN DATABASE,Chilasa clytia,Papilio clytia,genus synonym,1775,Add the reported name as a searchable synonym
+IN DATABASE,Parathyma perius,Athyma perius,genus synonym,303,Add the reported name as a searchable synonym
+IN DATABASE,Polyura agrarius,Charaxes agrarius,genus synonym,294,Add the reported name as a searchable synonym
+IN DATABASE,Parathyma selenophora,Athyma selenophora,genus synonym,274,Add the reported name as a searchable synonym
+IN DATABASE,Parathyma ranga,Athyma ranga,genus synonym,266,Add the reported name as a searchable synonym
+IN DATABASE,Aphnaeus lilacinus,Cigaritis lilacinus,genus synonym,99,Add the reported name as a searchable synonym
+IN DATABASE,Limenitis asura,Athyma asura,genus synonym,55,Add the reported name as a searchable synonym
+IN DATABASE,Pseudoborbo bevani,Borbo bevani,genus synonym,47,Add the reported name as a searchable synonym
+IN DATABASE,Polyura schreiber,Polyura schreiberi / Charaxes schreiber,spelling variant,33,Add the reported name as a searchable synonym
+IN DATABASE,Gerosis phisara,Daimio phisara,genus synonym,33,Add the reported name as a searchable synonym
+IN DATABASE,Deudorix isocrates,Virachola isocrates,genus synonym,18,Add the reported name as a searchable synonym
+IN DATABASE,Limenitis jina,Pantoporia jina  [DEACTIVATED - hidden in app],genus synonym,16,Add the reported name as a searchable synonym
+IN DATABASE,Apatura parisatis,Rohana parisatis,genus synonym,16,Add the reported name as a searchable synonym
+IN DATABASE,Tajuria maculatus,Tajuria maculata,gender-ending variant,16,Add the reported name as a searchable synonym
+IN DATABASE,Ops melastigma,Tajuria melastigma,genus synonym,7,Add the reported name as a searchable synonym
+IN DATABASE,Chliaria nilgirica,Hypolycaena nilgirica,genus synonym,5,Add the reported name as a searchable synonym
+IN DATABASE,Aphnaeus ictis,Cigaritis ictis,genus synonym,2,Add the reported name as a searchable synonym
+IN DATABASE,Castalius ananda,Tarucus ananda,genus synonym,1,Add the reported name as a searchable synonym
+IN DATABASE,Cyaniris albidisca,Celatoxia albidisca,genus synonym,1,Add the reported name as a searchable synonym
+NOT IN DATABASE,Kallima sylvia,,Nymphalidae - no matching record,724,Ingest this species
+NOT IN DATABASE,Mycalesis patnia,,Nymphalidae - no matching record,517,Ingest this species
+NOT IN DATABASE,Baracus vittatus,,Hesperiidae - no matching record,92,Ingest this species
+NOT IN DATABASE,Actinor radians,,Hesperiidae - no matching record,2,Ingest this species
+NOT IN DATABASE,Melanitis atrax,,Nymphalidae - no matching record,1,Ingest this species
+NOT IN DATABASE,Prothoe franck,,Nymphalidae - no matching record,1,Ingest this species
+NOT IN DATABASE,Ypthima savara,,Nymphalidae - no matching record,1,Ingest this species
+NOT IN DATABASE,Lethe ramadeva,,Nymphalidae - no matching record,1,Ingest this species
+NOT IN DATABASE,Euploea eyndhovii,,Nymphalidae - no matching record,1,Ingest this species
+NOT IN DATABASE,Heliophorus saphir,,Lycaenidae - no matching record,1,Ingest this species
+NOT IN DATABASE,Heliophorus viridipunctata,,Lycaenidae - no matching record,1,Ingest this species
+NOT IN DATABASE,Lysandra bellargus,,Lycaenidae - no matching record,1,Ingest this species
+NOT IN DATABASE,Chrysozephyrus tytleri,,Lycaenidae - no matching record,1,Ingest this species
+NOT IN DATABASE,Parnara apostata,,Hesperiidae - no matching record,1,Ingest this species
