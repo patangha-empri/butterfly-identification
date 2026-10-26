@@ -5,15 +5,23 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
+def _normalize_db_url(url: str) -> str:
+    # Only psycopg2 is installed; Supabase/Heroku-style URLs may name another driver.
+    for prefix in ("postgresql+psycopg://", "postgres://"):
+        if url.startswith(prefix):
+            return "postgresql://" + url[len(prefix):]
+    return url
+
+
 class BaseConfig:
     # ── Flask ──────────────────────────────────────────────────────────────────
     SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key-change-in-production")
 
     # ── Database ───────────────────────────────────────────────────────────────
-    SQLALCHEMY_DATABASE_URI = os.environ.get(
+    SQLALCHEMY_DATABASE_URI = _normalize_db_url(os.environ.get(
         "DATABASE_URL",
         "postgresql://postgres:postgres@localhost:5432/butterfly_db",
-    )
+    ))
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {
         "pool_pre_ping": True,
