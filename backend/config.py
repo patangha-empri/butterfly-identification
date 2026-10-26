@@ -6,10 +6,11 @@ load_dotenv()
 
 
 def _normalize_db_url(url: str) -> str:
-    # Only psycopg2 is installed; Supabase/Heroku-style URLs may name another driver.
-    for prefix in ("postgresql+psycopg://", "postgres://"):
+    # Only psycopg2 is installed. Name it explicitly: SQLAlchemy 2.1 maps a bare
+    # postgresql:// to psycopg v3, and Supabase/Heroku URLs may name other drivers.
+    for prefix in ("postgresql+psycopg://", "postgresql://", "postgres://"):
         if url.startswith(prefix):
-            return "postgresql://" + url[len(prefix):]
+            return "postgresql+psycopg2://" + url[len(prefix):]
     return url
 
 

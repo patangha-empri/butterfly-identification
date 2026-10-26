@@ -4,6 +4,7 @@ Werkzeug==3.0.4
 
 # ── Database ──────────────────────────────────────────────────────────────────
 Flask-SQLAlchemy==3.1.1
+SQLAlchemy==2.0.51            # pinned: 2.1 makes plain postgresql:// load psycopg v3, which isn't installed
 Flask-Migrate==4.0.7
 psycopg2-binary==2.9.12
 supabase==2.31.0              # PostgREST client — used where direct Postgres (5432/6543) is firewalled
